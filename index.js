@@ -1,5 +1,5 @@
 require("dotenv").config();
-console.log("TOKEN:", process.env.TOKEN);
+
 
 require("http")
   .createServer((req, res) => res.end("OK"))
