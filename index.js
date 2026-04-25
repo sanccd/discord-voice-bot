@@ -130,40 +130,50 @@ client.on("voiceStateUpdate", async (oldState, newState) => {
   const userId = newState.id || oldState.id;
   const guildId = newState.guild?.id || oldState.guild?.id;
 
-  // ตรวจจับเมื่อ user เข้า voice channel ใหม่
-  if (!oldState.channel && newState.channel) {
-    console.log("🔥 JOIN EVENT TRIGGERED"); // 👈 เพิ่ม
-    if (newState.member.user.bot) return; // กัน bot
+  console.log("VOICE EVENT:", {
+    user: newState.member?.user?.username,
+    old: oldState.channelId,
+    new: newState.channelId,
+  });
+
+  // ❌ กัน bot
+  if (newState.member?.user?.bot) return;
+
+  // 🟢 เข้า voice
+  if (!oldState.channelId && newState.channelId) {
+    console.log("🔥 JOIN");
 
     const joinTime = Date.now();
 
-    console.log(
-      `🎧 ${newState.member?.user?.username} เข้าห้อง Voice: ${newState.channel.name}`,
-    );
-
     await saveJoinSession(userId, guildId, joinTime);
-
-    // ✅ เพิ่มบรรทัดนี้
     await sendJoinLog(newState);
   }
 
-  // ตรวจจับเมื่อ user ออกจาก voice channel
-  if (oldState.channel && !newState.channel) {
-    const leaveTime = Date.now();
-    const username = oldState.member?.user?.username || "Unknown";
+  // 🔴 ออก voice
+  else if (oldState.channelId && !newState.channelId) {
+    console.log("🔴 LEAVE");
 
-    console.log(`🔴 ${username} ออกจากห้อง Voice: ${oldState.channel.name}`);
+    const leaveTime = Date.now();
 
     const durationSeconds = await saveLeaveSession(userId, leaveTime);
 
     if (durationSeconds) {
-      const durationMinutes = Math.floor(durationSeconds / 60);
-
-      console.log(`⏱️ ${username} อยู่ใน Voice ${durationMinutes} นาที`);
-
-      // ส่ง log ไปยัง channel ที่กำหนด
       await sendLogMessage(oldState, durationSeconds);
     }
+  }
+
+  // 🔁 ย้ายห้อง
+  else if (
+    oldState.channelId &&
+    newState.channelId &&
+    oldState.channelId !== newState.channelId
+  ) {
+    console.log("🔁 MOVE");
+
+    const leaveTime = Date.now();
+
+    await saveLeaveSession(userId, leaveTime);
+    await saveJoinSession(userId, guildId, Date.now());
   }
 });
 
