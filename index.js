@@ -51,7 +51,7 @@ if (!CONFIG.LOG_JOIN_CHANNEL_ID) {
 }
 
 // Event: เมื่อบอทพร้อมใช้งาน
-client.once("clientReady", async () => {
+client.once("ready", async () => {
   console.log("✅ Bot is online");
 
   // สร้าง slash command สำหรับ leaderboard
