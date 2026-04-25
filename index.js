@@ -29,6 +29,7 @@ const client = new Client({
 const CONFIG = {
   TOKEN: process.env.TOKEN,
   LOG_CHANNEL_ID: process.env.LOG_CHANNEL_ID,
+  LOG_JOIN_CHANNEL_ID: process.env.LOG_JOIN_CHANNEL_ID,
 };
 if (!CONFIG.TOKEN) {
   console.error("❌ TOKEN ไม่มี!");
@@ -37,6 +38,11 @@ if (!CONFIG.TOKEN) {
 
 if (!CONFIG.LOG_CHANNEL_ID) {
   console.error("❌ LOG_CHANNEL_ID ไม่มี!");
+  process.exit(1);
+}
+
+if (!CONFIG.LOG_JOIN_CHANNEL_ID) {
+  console.error("❌ LOG_JOIN_CHANNEL_ID ไม่มี!");
   process.exit(1);
 }
 
@@ -118,6 +124,8 @@ client.on("voiceStateUpdate", async (oldState, newState) => {
 
   // ตรวจจับเมื่อ user เข้า voice channel ใหม่
   if (!oldState.channel && newState.channel) {
+    if (newState.member.user.bot) return; // กัน bot
+
     const joinTime = Date.now();
 
     console.log(
@@ -125,6 +133,9 @@ client.on("voiceStateUpdate", async (oldState, newState) => {
     );
 
     await saveJoinSession(userId, guildId, joinTime);
+
+    // ✅ เพิ่มบรรทัดนี้
+    await sendJoinLog(newState);
   }
 
   // ตรวจจับเมื่อ user ออกจาก voice channel
@@ -169,6 +180,32 @@ async function sendLogMessage(state, durationSeconds) {
       { name: "User", value: username, inline: true },
       { name: "Channel", value: channelName, inline: true },
       { name: "Duration", value: durationFormatted, inline: true },
+    )
+    .setTimestamp();
+
+  await logChannel.send({ embeds: [embed] }).catch(console.error);
+}
+
+async function sendJoinLog(state) {
+  const logChannel = await client.channels
+    .fetch(CONFIG.LOG_JOIN_CHANNEL_ID)
+    .catch(() => null);
+
+  if (!logChannel) {
+    console.log("⚠️ Join log channel not found");
+    return;
+  }
+
+  const username = state.member?.user?.username || "Unknown";
+  const channelName = state.channel?.name || "Unknown";
+
+  const embed = new EmbedBuilder()
+    .setTitle("🟢 Voice Channel Join")
+    .setColor(0x00ff00)
+    .addFields(
+      { name: "User", value: username, inline: true },
+      { name: "Channel", value: channelName, inline: true },
+      { name: "Time", value: `<t:${Math.floor(Date.now() / 1000)}:T>` },
     )
     .setTimestamp();
 
