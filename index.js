@@ -1,6 +1,5 @@
 require("dotenv").config();
 
-
 require("http")
   .createServer((req, res) => res.end("OK"))
   .listen(process.env.PORT || 3000);
@@ -242,9 +241,10 @@ async function startBot() {
     console.log("TOKEN LENGTH:", process.env.TOKEN?.length);
 
     await client.login(process.env.TOKEN);
+
     console.log("🔥 LOGIN SUCCESS");
   } catch (error) {
-    console.error("❌ LOGIN ERROR:", error);
+    console.error("❌ Failed to start bot:", error);
     process.exit(1);
   }
 }
