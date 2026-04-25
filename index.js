@@ -1,5 +1,6 @@
 require("dotenv").config();
 
+
 require("http")
   .createServer((req, res) => res.end("OK"))
   .listen(process.env.PORT || 3000);
@@ -19,6 +20,8 @@ const {
   saveLeaveSession,
   getLeaderboard,
 } = require("./database");
+
+initDatabase();
 
 // สร้าง Client พร้อม Intents
 const client = new Client({
@@ -233,20 +236,46 @@ function formatDuration(seconds) {
 }
 
 // เริ่มต้นบอท
-async function startBot() {
-  try {
-    initDatabase();
+let isStarting = false;
 
+async function startBot() {
+  if (isStarting) return; // 🔥 กันซ้อน
+  isStarting = true;
+
+  try {
     console.log("TOKEN EXISTS:", !!process.env.TOKEN);
     console.log("TOKEN LENGTH:", process.env.TOKEN?.length);
 
-    await client.login(process.env.TOKEN);
+    console.log("🚀 START LOGIN...");
+
+    const loginPromise = client.login(process.env.TOKEN);
+
+    const timeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("Login timeout")), 10000),
+    );
+
+    await Promise.race([loginPromise, timeout]);
 
     console.log("🔥 LOGIN SUCCESS");
   } catch (error) {
     console.error("❌ LOGIN ERROR:", error);
-    process.exit(1);
+
+    setTimeout(() => {
+      console.log("🔁 RETRY LOGIN...");
+      isStarting = false; // 🔥 reset ก่อน retry
+      startBot();
+    }, 5000);
   }
 }
+
+client.on("disconnect", () => {
+  console.log("⚠️ Disconnected!");
+});
+
+client.on("reconnecting", () => {
+  console.log("🔄 Reconnecting...");
+});
+
+client.on("error", console.error);
 
 startBot();
