@@ -41,15 +41,15 @@ if (!CONFIG.TOKEN) {
   process.exit(1);
 }
 
-if (!CONFIG.LOG_CHANNEL_ID) {
-  console.error("❌ LOG_CHANNEL_ID ไม่มี!");
-  process.exit(1);
-}
+// if (!CONFIG.LOG_CHANNEL_ID) {
+//   console.error("❌ LOG_CHANNEL_ID ไม่มี!");
+//   process.exit(1);
+// }
 
-if (!CONFIG.LOG_JOIN_CHANNEL_ID) {
-  console.error("❌ LOG_JOIN_CHANNEL_ID ไม่มี!");
-  process.exit(1);
-}
+// if (!CONFIG.LOG_JOIN_CHANNEL_ID) {
+//   console.error("❌ LOG_JOIN_CHANNEL_ID ไม่มี!");
+//   process.exit(1);
+// }
 
 // Event: เมื่อบอทพร้อมใช้งาน
 client.once("ready", async () => {
@@ -255,7 +255,7 @@ async function startBot() {
 
    client.on("error", console.error);
    client.on("debug", console.log);
-   
+
   } catch (error) {
     console.error("❌ Failed to start bot:", error);
     process.exit(1);
