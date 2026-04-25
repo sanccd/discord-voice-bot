@@ -1,4 +1,5 @@
 require("dotenv").config();
+console.log("TOKEN:", process.env.TOKEN);
 
 require("http")
   .createServer((req, res) => res.end("OK"))
@@ -128,6 +129,7 @@ client.on("voiceStateUpdate", async (oldState, newState) => {
 
   // ตรวจจับเมื่อ user เข้า voice channel ใหม่
   if (!oldState.channel && newState.channel) {
+    console.log("🔥 JOIN EVENT TRIGGERED"); // 👈 เพิ่ม
     if (newState.member.user.bot) return; // กัน bot
 
     const joinTime = Date.now();
