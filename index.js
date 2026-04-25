@@ -269,6 +269,7 @@ async function sendJoinLog(state) {
       { name: "User", value: username, inline: true },
       { name: "Channel", value: channelName, inline: true },
       { name: "Time", value: `<t:${Math.floor(Date.now() / 1000)}:T>` },
+      
     )
     .setTimestamp();
 
@@ -340,6 +341,30 @@ client.on("messageDelete", async (message) => {
       .fetch(CONFIG.LOG_DELETE_CHANNEL_ID)
       .catch(() => null);
 
+      let deletedBy = "Unknown";
+
+      try {
+        const fetchedLogs = await message.guild.fetchAuditLogs({
+          limit: 5,
+          type: 72,
+        });
+
+        const deletionLog = fetchedLogs.entries.find((entry) => {
+          return (
+            entry.target?.id === message.author?.id &&
+            Date.now() - entry.createdTimestamp < 5000
+          );
+        });
+
+        if (deletionLog) {
+          deletedBy = deletionLog.executor?.tag || "Unknown";
+        } else {
+          deletedBy = message.author?.tag || "Unknown (self delete)";
+        }
+      } catch (err) {
+        console.log("⚠️ Cannot fetch audit logs");
+      }
+
     if (!logChannel) {
       console.log("⚠️ Delete log channel not found");
       return;
@@ -366,6 +391,13 @@ client.on("messageDelete", async (message) => {
           value: message.author?.tag || "Unknown",
           inline: true,
         },
+
+        {
+          name: "Deleted By",
+          value: deletedBy,
+          inline: true,
+        },
+
         {
           name: "Channel",
           value: `<#${message.channel.id}>`,
