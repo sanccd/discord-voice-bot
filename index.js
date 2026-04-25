@@ -240,24 +240,11 @@ async function startBot() {
     console.log("TOKEN EXISTS:", !!process.env.TOKEN);
     console.log("TOKEN LENGTH:", process.env.TOKEN?.length);
 
-   client
-     .login(process.env.TOKEN)
-     .then(() => {
-       console.log("🔥 LOGIN SUCCESS");
-     })
-     .catch((err) => {
-       console.error("❌ LOGIN ERROR:", err);
-     });
+    await client.login(process.env.TOKEN);
 
-   client.on("ready", () => {
-     console.log("✅ Bot is online");
-   });
-
-   client.on("error", console.error);
-   client.on("debug", console.log);
-
+    console.log("🔥 LOGIN SUCCESS");
   } catch (error) {
-    console.error("❌ Failed to start bot:", error);
+    console.error("❌ LOGIN ERROR:", error);
     process.exit(1);
   }
 }
