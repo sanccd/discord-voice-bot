@@ -239,8 +239,14 @@ async function startBot() {
     // สร้างตารางใน database
     initDatabase();
 
+    console.log("TOKEN EXISTS:", !!process.env.TOKEN);
+    console.log("TOKEN LENGTH:", process.env.TOKEN?.length); // 👈 เพิ่มตรงนี้
+
     // Login ด้วย Token
-    await client.login(CONFIG.TOKEN);
+    await client.login(process.env.TOKEN);
+
+    console.log("🔥 LOGIN SUCCESS"); // 👈 เพิ่มอันนี้ด้วย
+
   } catch (error) {
     console.error("❌ Failed to start bot:", error);
     process.exit(1);
