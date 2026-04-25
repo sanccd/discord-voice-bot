@@ -105,6 +105,26 @@ function getUserTime(userId) {
   return row ? row.total_time : 0;
 }
 
+function getUserRank(userId) {
+  const rows = db
+    .prepare(
+      `
+    SELECT user_id, total_time
+    FROM voice_stats
+    ORDER BY total_time DESC
+  `,
+    )
+    .all();
+
+  for (let i = 0; i < rows.length; i++) {
+    if (rows[i].user_id === userId) {
+      return i + 1;
+    }
+  }
+
+  return null;
+}
+
 module.exports = {
   db,
   initDatabase,
@@ -112,4 +132,5 @@ module.exports = {
   saveLeaveSession,
   getLeaderboard,
   getUserTime,
+  getUserRank,
 };

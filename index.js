@@ -19,6 +19,8 @@ const {
   saveJoinSession,
   saveLeaveSession,
   getLeaderboard,
+  getUserTime,
+  getUserRank,
 } = require("./database");
 
 initDatabase();
@@ -55,7 +57,7 @@ if (!CONFIG.TOKEN) {
 // }
 
 // Event: เมื่อบอทพร้อมใช้งาน
-client.once("ready", async () => {
+client.once("clientReady", async () => {
   console.log("✅ Bot is online");
 
   // สร้าง slash command สำหรับ leaderboard
@@ -67,7 +69,18 @@ client.once("ready", async () => {
         name: "leaderboard",
         description: "แสดงตารางคนที่ใช้เวลาใน Voice มากที่สุด 10 อันดับ",
       });
-      console.log(`✅ Command /leaderboard created in ${guild.name}`);
+
+      await guild.commands.create({
+        name: "time",
+        description: "ดูเวลาที่คุณอยู่ใน Voice",
+      });
+
+      await guild.commands.create({
+        name: "rank",
+        description: "ดูอันดับของคุณ",
+      });
+
+      console.log(`✅ Commands created in ${guild.name}`);
     } catch (error) {
       console.error(
         `❌ Failed to create command in ${guild.name}:`,
@@ -77,12 +90,30 @@ client.once("ready", async () => {
   });
 });
 
+
+
 // Event: จัดการ Slash Commands
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
   if (interaction.commandName === "leaderboard") {
-    await handleLeaderboard(interaction);
+    return handleLeaderboard(interaction);
+  }
+
+  if (interaction.commandName === "time") {
+    const total = await getUserTime(interaction.user.id);
+
+    return interaction.reply(
+      `⏱️ คุณอยู่ใน Voice ไปแล้ว ${formatDuration(total)}`,
+    );
+  }
+
+  if (interaction.commandName === "rank") {
+    const rank = await getUserRank(interaction.user.id);
+
+    return interaction.reply(
+      rank ? `🏆 อันดับของคุณคือ #${rank}` : "❌ ยังไม่มีอันดับ",
+    );
   }
 });
 
@@ -99,21 +130,29 @@ async function handleLeaderboard(interaction) {
     }
 
     const embed = new EmbedBuilder()
-      .setTitle("🏆 Voice Time Leaderboard")
-      .setColor(0x00ae86)
-      .setTimestamp();
+      .setTitle("🏆 Voice Leaderboard")
+      .setColor(0x5865f2)
+      .setThumbnail(interaction.guild.iconURL())
+      .setTimestamp()
+      .setFooter({ text: "Voice Tracker Bot" });
 
     let description = "";
-    const medals = ["🥇", "🥈", "🥉"];
+
+    const max = leaderboard[0].total_time || 1; // 🔥 เอาออกมานอก loop
 
     for (let i = 0; i < leaderboard.length; i++) {
       const entry = leaderboard[i];
-      const user = await client.users.fetch(entry.user_id).catch(() => null);
-      const username = user ? user.username : `Unknown (${entry.user_id})`;
-      const timeFormatted = formatDuration(entry.total_time);
-      const medal = medals[i] || `${i + 1}.`;
 
-      description += `${medal} **${username}** - ${timeFormatted}\n`;
+      const user = await client.users.fetch(entry.user_id).catch(() => null);
+      const username = user ? user.username : "Unknown";
+
+      const percent = entry.total_time / max;
+
+     const medals = ["🥇", "🥈", "🥉"];
+     const rankIcon = medals[i] || `${i + 1}.`;
+
+     description += `${rankIcon} **${username}**
+${progressBar(percent)} ${formatDuration(entry.total_time)}\n\n`;
     }
 
     embed.setDescription(description);
@@ -123,6 +162,12 @@ async function handleLeaderboard(interaction) {
     console.error("Error in leaderboard command:", error);
     await interaction.editReply("❌ เกิดข้อผิดพลาดในการดึงข้อมูล Leaderboard");
   }
+}
+
+function progressBar(percent) {
+  const total = 10;
+  const filled = Math.round(percent * total);
+  return "█".repeat(filled) + "░".repeat(total - filled);
 }
 
 // Event: ตรวจจับการเข้า/ออก Voice Channel
