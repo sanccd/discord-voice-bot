@@ -236,19 +236,15 @@ function formatDuration(seconds) {
 // เริ่มต้นบอท
 async function startBot() {
   try {
-    // สร้างตารางใน database
     initDatabase();
 
     console.log("TOKEN EXISTS:", !!process.env.TOKEN);
-    console.log("TOKEN LENGTH:", process.env.TOKEN?.length); // 👈 เพิ่มตรงนี้
+    console.log("TOKEN LENGTH:", process.env.TOKEN?.length);
 
-    // Login ด้วย Token
     await client.login(process.env.TOKEN);
-
-    console.log("🔥 LOGIN SUCCESS"); // 👈 เพิ่มอันนี้ด้วย
-
+    console.log("🔥 LOGIN SUCCESS");
   } catch (error) {
-    console.error("❌ Failed to start bot:", error);
+    console.error("❌ LOGIN ERROR:", error);
     process.exit(1);
   }
 }
