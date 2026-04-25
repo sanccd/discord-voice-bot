@@ -1,6 +1,5 @@
 require("dotenv").config();
 
-
 require("http")
   .createServer((req, res) => res.end("OK"))
   .listen(process.env.PORT || 3000);
@@ -92,8 +91,6 @@ client.once("clientReady", async () => {
   });
 });
 
-
-
 // Event: จัดการ Slash Commands
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
@@ -150,10 +147,10 @@ async function handleLeaderboard(interaction) {
 
       const percent = entry.total_time / max;
 
-     const medals = ["🥇", "🥈", "🥉"];
-     const rankIcon = medals[i] || `${i + 1}.`;
+      const medals = ["🥇", "🥈", "🥉"];
+      const rankIcon = medals[i] || `${i + 1}.`;
 
-     description += `${rankIcon} **${username}**
+      description += `${rankIcon} **${username}**
 ${progressBar(percent)} ${formatDuration(entry.total_time)}\n\n`;
     }
 
@@ -168,7 +165,7 @@ ${progressBar(percent)} ${formatDuration(entry.total_time)}\n\n`;
 
 function progressBar(percent) {
   const total = 10;
- const filled = Math.max(1, Math.round(percent * total));
+  const filled = Math.max(1, Math.round(percent * total));
   return "█".repeat(filled) + "░".repeat(total - filled);
 }
 
@@ -344,19 +341,19 @@ client.on("messageDelete", async (message) => {
       .catch(() => null);
 
     if (!logChannel) {
-      console.log("⚠️ Delete log channel not found");git add .
+      console.log("⚠️ Delete log channel not found");
       return;
     }
 
-  const hasAttachment = message.attachments && message.attachments.size > 0;
+    const hasAttachment = message.attachments && message.attachments.size > 0;
 
-  const content =
-    message.content ||
-    (hasAttachment ? "📎 เป็นไฟล์/รูปภาพ" : "❌ ไม่สามารถดึงข้อความได้");
+    const content =
+      message.content ||
+      (hasAttachment ? "📎 เป็นไฟล์/รูปภาพ" : "❌ ไม่สามารถดึงข้อความได้");
 
-   const attachments = message.attachments
-     ? message.attachments.map((a) => a.url).join("\n")
-     : "";
+    const attachments = message.attachments
+      ? message.attachments.map((a) => a.url).join("\n")
+      : "";
 
     const link = `https://discord.com/channels/${message.guild.id}/${message.channel.id}/${message.id}`;
 
