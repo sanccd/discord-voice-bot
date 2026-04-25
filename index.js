@@ -1,5 +1,9 @@
 require("dotenv").config();
 
+require("http")
+  .createServer((req, res) => res.end("OK"))
+  .listen(process.env.PORT || 3000);
+
 process.on("uncaughtException", console.error);
 process.on("unhandledRejection", console.error);
 
