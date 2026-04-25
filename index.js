@@ -32,6 +32,7 @@ const client = new Client({
     GatewayIntentBits.GuildVoiceStates,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.MessageContent,
   ],
 });
 
@@ -40,6 +41,7 @@ const CONFIG = {
   TOKEN: process.env.TOKEN,
   LOG_CHANNEL_ID: process.env.LOG_CHANNEL_ID,
   LOG_JOIN_CHANNEL_ID: process.env.LOG_JOIN_CHANNEL_ID,
+  LOG_DELETE_CHANNEL_ID: process.env.LOG_DELETE_CHANNEL_ID,
 };
 if (!CONFIG.TOKEN) {
   console.error("❌ TOKEN ไม่มี!");
@@ -166,7 +168,7 @@ ${progressBar(percent)} ${formatDuration(entry.total_time)}\n\n`;
 
 function progressBar(percent) {
   const total = 10;
-  const filled = Math.round(percent * total);
+ const filled = Math.max(1, Math.round(percent * total));
   return "█".repeat(filled) + "░".repeat(total - filled);
 }
 
@@ -332,5 +334,72 @@ client.on("reconnecting", () => {
 });
 
 client.on("error", console.error);
+
+client.on("messageDelete", async (message) => {
+  try {
+    if (!message.guild || !message.author || message.author.bot) return;
+
+    const logChannel = await client.channels
+      .fetch(CONFIG.LOG_DELETE_CHANNEL_ID)
+      .catch(() => null);
+
+    if (!logChannel) {
+      console.log("⚠️ Delete log channel not found");git add .
+      return;
+    }
+
+  const hasAttachment = message.attachments && message.attachments.size > 0;
+
+  const content =
+    message.content ||
+    (hasAttachment ? "📎 เป็นไฟล์/รูปภาพ" : "❌ ไม่สามารถดึงข้อความได้");
+
+   const attachments = message.attachments
+     ? message.attachments.map((a) => a.url).join("\n")
+     : "";
+
+    const link = `https://discord.com/channels/${message.guild.id}/${message.channel.id}/${message.id}`;
+
+    const embed = new EmbedBuilder()
+      .setTitle("🗑️ Message Deleted")
+      .setColor(0xff0000)
+      .addFields(
+        {
+          name: "User",
+          value: message.author?.tag || "Unknown",
+          inline: true,
+        },
+        {
+          name: "Channel",
+          value: `<#${message.channel.id}>`,
+          inline: true,
+        },
+        {
+          name: "Message ID",
+          value: message.id,
+        },
+        {
+          name: "Content",
+          value: content.slice(0, 1000),
+        },
+        {
+          name: "Jump",
+          value: `[คลิกดูข้อความ](${link})`,
+        },
+      )
+      .setTimestamp();
+
+    if (attachments) {
+      embed.addFields({
+        name: "Attachments",
+        value: attachments,
+      });
+    }
+
+    await logChannel.send({ embeds: [embed] });
+  } catch (err) {
+    console.error("Delete log error:", err);
+  }
+});
 
 startBot();
