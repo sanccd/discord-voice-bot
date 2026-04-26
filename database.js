@@ -125,6 +125,19 @@ function getUserRank(userId) {
   return null;
 }
 
+function searchUserSessions(userId, guildId, limit = 10) {
+  return db
+    .prepare(
+      `
+      SELECT * FROM voice_sessions
+      WHERE user_id = ? AND guild_id = ?
+      ORDER BY id DESC
+      LIMIT ?
+    `,
+    )
+    .all(userId, guildId, limit);
+}
+
 module.exports = {
   db,
   initDatabase,
@@ -133,4 +146,5 @@ module.exports = {
   getLeaderboard,
   getUserTime,
   getUserRank,
+  searchUserSessions,
 };
