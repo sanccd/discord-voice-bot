@@ -20,7 +20,6 @@ const {
   getLeaderboard,
   getUserTime,
   getUserRank,
-  searchUserSessions,
 } = require("./database");
 
 initDatabase();
@@ -90,19 +89,6 @@ client.once("clientReady", async () => {
       await guild.commands.create({
         name: "userinfo",
         description: "ดูข้อมูล user",
-      });
-
-      await guild.commands.create({
-        name: "search",
-        description: "ค้นหา log ของ user",
-        options: [
-          {
-            name: "user",
-            type: 6,
-            description: "เลือก user",
-            required: true,
-          },
-        ],
       });
 
       console.log(`✅ Commands created in ${guild.name}`);
@@ -203,35 +189,6 @@ if (interaction.commandName === "userinfo") {
   return interaction.reply({ embeds: [embed] });
 }
 
-if (interaction.commandName === "search") {
-  await interaction.deferReply(); // 🔥 เพิ่มบรรทัดนี้
-
-  const target = interaction.options.getUser("user");
-
-  const logs = await searchUserSessions(target.id, interaction.guild.id);
-
-  if (logs.length === 0) {
-    return interaction.editReply("❌ ไม่พบข้อมูล"); // 🔥 เปลี่ยน reply → editReply
-  }
-
-  let description = "";
-
-  logs.forEach((log, i) => {
-    const duration = formatDuration(log.duration || 0);
-
-    description += `${i + 1}.
-⏱ ${duration}
-🕒 <t:${Math.floor(log.join_time / 1000)}:R>\n\n`;
-  });
-
-  const embed = new EmbedBuilder()
-    .setTitle(`🔍 Logs ของ ${target.username}`)
-    .setColor(0x5865f2)
-    .setDescription(description)
-    .setTimestamp();
-
-  return interaction.editReply({ embeds: [embed] }); // 🔥 เปลี่ยนตรงนี้ด้วย
-}
 
 });
 
