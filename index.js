@@ -81,6 +81,16 @@ client.once("clientReady", async () => {
         description: "ดูอันดับของคุณ",
       });
 
+      await guild.commands.create({
+        name: "stats",
+        description: "ดูข้อมูล server",
+      });
+
+      await guild.commands.create({
+        name: "userinfo",
+        description: "ดูข้อมูล user",
+      });
+
       console.log(`✅ Commands created in ${guild.name}`);
     } catch (error) {
       console.error(
@@ -114,6 +124,53 @@ client.on("interactionCreate", async (interaction) => {
       rank ? `🏆 อันดับของคุณคือ #${rank}` : "❌ ยังไม่มีอันดับ",
     );
   }
+
+if (interaction.commandName === "stats") {
+  const guild = interaction.guild;
+
+ await guild.members.fetch(); // 🔥 เพิ่มบรรทัดนี้
+
+ const totalMembers = guild.memberCount;
+
+ const voiceUsers = guild.members.cache.filter((m) => m.voice.channel).size;
+
+  const embed = new EmbedBuilder()
+    .setTitle("📊 Server Stats")
+    .setThumbnail(guild.iconURL())
+    .setColor(0x5865f2)
+    .addFields(
+      { name: "👥 Members", value: `${totalMembers}`, inline: true },
+      { name: "🎧 In Voice", value: `${voiceUsers}`, inline: true },
+    )
+    .setTimestamp();
+
+  return interaction.reply({ embeds: [embed] });
+}
+
+if (interaction.commandName === "userinfo") {
+  const member = await interaction.guild.members.fetch(interaction.user.id);
+
+  const embed = new EmbedBuilder()
+    .setTitle("👤 User Info")
+    .setColor(0x00ae86)
+    .setThumbnail(member.user.displayAvatarURL())
+    .addFields(
+      { name: "Username", value: member.user.tag, inline: true },
+      { name: "ID", value: member.user.id, inline: true },
+      {
+        name: "Joined Server",
+        value: `<t:${Math.floor(member.joinedTimestamp / 1000)}:F>`,
+      },
+      {
+        name: "Account Created",
+        value: `<t:${Math.floor(member.user.createdTimestamp / 1000)}:F>`,
+      },
+    )
+    .setTimestamp();
+
+  return interaction.reply({ embeds: [embed] });
+}
+
 });
 
 // ฟังก์ชันสำหรับแสดง Leaderboard
