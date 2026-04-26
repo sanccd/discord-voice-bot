@@ -141,6 +141,7 @@ if (interaction.commandName === "stats") {
     .addFields(
       { name: "👥 Members", value: `${totalMembers}`, inline: true },
       { name: "🎧 In Voice", value: `${voiceUsers}`, inline: true },
+      { name: "\u200b", value: "\u200b" }, // 🔥 บังคับขึ้นบรรทัดใหม่
     )
     .setTimestamp();
 
@@ -155,14 +156,31 @@ if (interaction.commandName === "userinfo") {
     .setColor(0x00ae86)
     .setThumbnail(member.user.displayAvatarURL())
     .addFields(
-      { name: "Username", value: member.user.tag, inline: true },
-      { name: "ID", value: member.user.id, inline: true },
+      { name: "👤 Username", value: member.user.tag, inline: true },
+      { name: "🆔 ID", value: member.user.id, inline: true },
+
       {
-        name: "Joined Server",
+        name: "🟢 Status",
+        value: getStatus(member.presence?.status),
+        inline: true,
+      },
+
+      {
+        name: "🎭 Roles",
+        value:
+          member.roles.cache
+            .filter((r) => r.id !== interaction.guild.id)
+            .map((r) => r.toString())
+            .join(", ") || "None",
+      },
+
+      {
+        name: "📅 Joined Server",
         value: `<t:${Math.floor(member.joinedTimestamp / 1000)}:F>`,
       },
+
       {
-        name: "Account Created",
+        name: "⏳ Account Created",
         value: `<t:${Math.floor(member.user.createdTimestamp / 1000)}:F>`,
       },
     )
@@ -345,6 +363,19 @@ function formatDuration(seconds) {
     return `${minutes}m ${secs}s`;
   }
   return `${secs}s`;
+}
+
+function getStatus(status) {
+  switch (status) {
+    case "online":
+      return "🟢 Online";
+    case "idle":
+      return "🌙 Idle";
+    case "dnd":
+      return "⛔ Do Not Disturb";
+    default:
+      return "⚫ Offline";
+  }
 }
 
 // เริ่มต้นบอท
