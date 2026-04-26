@@ -1,5 +1,7 @@
 require("dotenv").config();
 
+const diceCooldown = new Map();
+
 require("http")
   .createServer((req, res) => res.end("OK"))
   .listen(process.env.PORT || 3000);
@@ -89,6 +91,21 @@ client.once("clientReady", async () => {
       await guild.commands.create({
         name: "userinfo",
         description: "ดูข้อมูล user",
+      });
+
+      await guild.commands.create({
+        name: "dice",
+        description: "ทอยลูกเต๋าในห้อง voice",
+        options: [
+          {
+            name: "amount",
+            description: "จำนวนลูกเต๋า (1 หรือ 2)",
+            type: 4, // INTEGER
+            required: true,
+            min_value: 1,
+            max_value: 2,
+          },
+        ],
       });
 
       console.log(`✅ Commands created in ${guild.name}`);
@@ -189,7 +206,70 @@ if (interaction.commandName === "userinfo") {
   return interaction.reply({ embeds: [embed] });
 }
 
+if (interaction.commandName === "dice") {
+  const now = Date.now();
+  const cooldown = 2500; // 2.5 วิ
 
+  if (diceCooldown.has(interaction.user.id)) {
+    const expire = diceCooldown.get(interaction.user.id) + cooldown;
+
+    if (now < expire) {
+      return interaction.reply({
+        content: "⏳ รอแป๊บไอจูด",
+        ephemeral: true,
+      });
+    }
+  }
+
+  diceCooldown.set(interaction.user.id, now);
+  const amount = interaction.options.getInteger("amount");
+
+  const voiceChannel = interaction.member.voice.channel;
+
+  if (!voiceChannel) {
+    return interaction.reply("❌ คุณต้องอยู่ใน voice ก่อน");
+  }
+
+  const members = [...voiceChannel.members.values()].filter((m) => !m.user.bot);
+
+  if (members.length < 2) {
+    return interaction.reply("❌ ต้องมีอย่างน้อย 2 คน");
+  }
+
+  // 🎲 roll
+  const results = members.map((member) => {
+    let rolls = [];
+
+    for (let i = 0; i < amount; i++) {
+      rolls.push(Math.floor(Math.random() * 6) + 1);
+    }
+
+    const total = rolls.reduce((a, b) => a + b, 0);
+
+    return {
+      name: member.displayName,
+      rolls,
+      total,
+    };
+  });
+
+  const min = Math.min(...results.map((r) => r.total));
+  const losers = results.filter((r) => r.total === min);
+
+  let text = `🎲 Dice (${amount} ลูก)\n\n`;
+
+  results.forEach((r) => {
+    text += `👤 ${r.name} → [${r.rolls.join(" + ")}] = **${r.total}**\n`;
+  });
+
+  text += "\n💀 คนที่โดน:\n";
+
+  losers.forEach((l) => {
+    text += `👉 ${l.name}\n`;
+  });
+
+ return interaction.reply({ content: text });
+}
 });
 
 // ฟังก์ชันสำหรับแสดง Leaderboard
