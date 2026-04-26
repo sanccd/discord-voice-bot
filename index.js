@@ -141,7 +141,7 @@ if (interaction.commandName === "stats") {
     .addFields(
       { name: "👥 Members", value: `${totalMembers}`, inline: true },
       { name: "🎧 In Voice", value: `${voiceUsers}`, inline: true },
-      { name: "\u200b", value: "\u200b" }, // 🔥 บังคับขึ้นบรรทัดใหม่
+      // { name: "\u200b", value: "\u200b" }, // 🔥 บังคับขึ้นบรรทัดใหม่
     )
     .setTimestamp();
 
@@ -307,21 +307,40 @@ async function sendLogMessage(state, durationSeconds) {
     return;
   }
 
-  const username = state.member?.user?.username || "Unknown";
+ const nickname = state.member?.displayName;
+ const usernameRaw = state.member?.user?.username;
+
+ const username =
+   nickname && nickname !== usernameRaw
+     ? `${nickname} (${usernameRaw})`
+     : usernameRaw || "Unknown";
   const channelName = state.channel?.name || "Unknown";
   const durationFormatted = formatDuration(durationSeconds);
+  const guildName = state.guild?.name || "Unknown Server";
 
   const embed = new EmbedBuilder()
     .setTitle("🔴 Voice Channel Leave")
-    .setColor(0xff0000)
+    .setColor(0xef4444) // 🔥 แดง soft
+    .setThumbnail(state.guild.iconURL()) // 🔥 รูป server
     .addFields(
-      { name: "User", value: username, inline: true },
-      { name: "Channel", value: channelName, inline: true },
-      { name: "Duration", value: durationFormatted, inline: true },
+      {
+        name: "🌐 Server",
+        value: guildName,
+      },
+
+      { name: "👤 User", value: username, inline: true },
+      { name: "📢 Channel", value: channelName, inline: true },
+      { name: "⏱ Duration", value: durationFormatted, inline: true },
+      {
+        name: "⏰ Left At",
+        value: `<t:${Math.floor(Date.now() / 1000)}:R>`,
+        inline: true,
+      },
     )
+    .setFooter({ text: "Voice Tracker" })
     .setTimestamp();
 
-  await logChannel.send({ embeds: [embed] }).catch(console.error);
+  await logChannel.send({ embeds: [embed] });
 }
 
 async function sendJoinLog(state) {
@@ -334,21 +353,38 @@ async function sendJoinLog(state) {
     return;
   }
 
-  const username = state.member?.user?.username || "Unknown";
+  const nickname = state.member?.displayName;
+  const usernameRaw = state.member?.user?.username;
+
+  const username =
+    nickname && nickname !== usernameRaw
+      ? `${nickname} (${usernameRaw})`
+      : usernameRaw || "Unknown";
   const channelName = state.channel?.name || "Unknown";
+  const guildName = state.guild?.name || "Unknown Server";
 
   const embed = new EmbedBuilder()
     .setTitle("🟢 Voice Channel Join")
-    .setColor(0x00ff00)
+    .setColor(0x22c55e) // 🔥 เขียว soft ดูแพง
+    .setThumbnail(state.guild.iconURL()) // 🔥 รูป server
     .addFields(
-      { name: "User", value: username, inline: true },
-      { name: "Channel", value: channelName, inline: true },
-      { name: "Time", value: `<t:${Math.floor(Date.now() / 1000)}:T>` },
-      
+      {
+        name: "🌐 Server",
+        value: guildName,
+      },
+
+      { name: "👤 User", value: username, inline: true },
+      { name: "📢 Channel", value: channelName, inline: true },
+      {
+        name: "⏰ Time",
+        value: `<t:${Math.floor(Date.now() / 1000)}:F> (<t:${Math.floor(Date.now() / 1000)}:R>)`,
+        inline: true,
+      },
     )
+    .setFooter({ text: "Voice Tracker" })
     .setTimestamp();
 
-  await logChannel.send({ embeds: [embed] }).catch(console.error);
+  await logChannel.send({ embeds: [embed] });
 }
 
 // ฟังก์ชันจัดรูปแบบ duration
