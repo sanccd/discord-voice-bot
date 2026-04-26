@@ -232,8 +232,8 @@ if (interaction.commandName === "dice") {
 
   const members = [...voiceChannel.members.values()].filter((m) => !m.user.bot);
 
-  if (members.length < 2) {
-    return interaction.reply("❌ ต้องมีอย่างน้อย 2 คน");
+  if (members.length < 1) {
+    return interaction.reply("❌ ต้องมีอย่างน้อย 1 คน");
   }
 
   // 🎲 roll
