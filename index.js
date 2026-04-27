@@ -6,9 +6,9 @@ require("http")
   .createServer((req, res) => res.end("OK"))
   .listen(process.env.PORT || 3000);
 
-  function diceEmoji(n) {
-    return ["⚀", "⚁", "⚂", "⚃", "⚄", "⚅"][n - 1];
-  }
+function diceEmoji(n) {
+  return ["⚀", "⚁", "⚂", "⚃", "⚄", "⚅"][n - 1];
+}
 
 process.on("uncaughtException", console.error);
 process.on("unhandledRejection", console.error);
@@ -161,224 +161,228 @@ client.on("interactionCreate", async (interaction) => {
     );
   }
 
-if (interaction.commandName === "stats") {
-  const guild = interaction.guild;
+  if (interaction.commandName === "stats") {
+    const guild = interaction.guild;
 
- await guild.members.fetch(); // 🔥 เพิ่มบรรทัดนี้
+    await guild.members.fetch(); // 🔥 เพิ่มบรรทัดนี้
 
- const totalMembers = guild.memberCount;
+    const totalMembers = guild.memberCount;
 
- const voiceUsers = guild.members.cache.filter((m) => m.voice.channel).size;
+    const voiceUsers = guild.members.cache.filter((m) => m.voice.channel).size;
 
-  const embed = new EmbedBuilder()
-    .setTitle("📊 Server Stats")
-    .setThumbnail(guild.iconURL())
-    .setColor(0x5865f2)
-    .addFields(
-      { name: "👥 Members", value: `${totalMembers}`, inline: true },
-      { name: "🎧 In Voice", value: `${voiceUsers}`, inline: true },
-      // { name: "\u200b", value: "\u200b" }, // 🔥 บังคับขึ้นบรรทัดใหม่
-    )
-    .setTimestamp();
+    const embed = new EmbedBuilder()
+      .setTitle("📊 Server Stats")
+      .setThumbnail(guild.iconURL())
+      .setColor(0x5865f2)
+      .addFields(
+        { name: "👥 Members", value: `${totalMembers}`, inline: true },
+        { name: "🎧 In Voice", value: `${voiceUsers}`, inline: true },
+        // { name: "\u200b", value: "\u200b" }, // 🔥 บังคับขึ้นบรรทัดใหม่
+      )
+      .setTimestamp();
 
-  return interaction.reply({ embeds: [embed] });
-}
-
-if (interaction.commandName === "userinfo") {
-  const member = await interaction.guild.members.fetch(interaction.user.id);
-
-  const embed = new EmbedBuilder()
-    .setTitle("👤 User Info")
-    .setColor(0x00ae86)
-    .setThumbnail(member.user.displayAvatarURL())
-    .addFields(
-      { name: "👤 Username", value: member.user.tag, inline: true },
-      { name: "🆔 ID", value: member.user.id, inline: true },
-
-      {
-        name: "🟢 Status",
-        value: getStatus(member.presence?.status),
-        inline: true,
-      },
-
-      {
-        name: "🎭 Roles",
-        value:
-          member.roles.cache
-            .filter((r) => r.id !== interaction.guild.id)
-            .map((r) => r.toString())
-            .join(", ") || "None",
-      },
-
-      {
-        name: "📅 Joined Server",
-        value: `<t:${Math.floor(member.joinedTimestamp / 1000)}:F>`,
-      },
-
-      {
-        name: "⏳ Account Created",
-        value: `<t:${Math.floor(member.user.createdTimestamp / 1000)}:F>`,
-      },
-    )
-    .setTimestamp();
-
-  return interaction.reply({ embeds: [embed] });
-}
-
-if (interaction.commandName === "dice") {
-  const now = Date.now();
-  const cooldown = 2500; // 2.5 วิ
-
-  if (diceCooldown.has(interaction.user.id)) {
-    const expire = diceCooldown.get(interaction.user.id) + cooldown;
-
-    if (now < expire) {
-      return interaction.reply({
-        content: "⏳ รอแป๊บไอจูด",
-        ephemeral: true,
-      });
-    }
+    return interaction.reply({ embeds: [embed] });
   }
 
-  diceCooldown.set(interaction.user.id, now);
-  const amount = interaction.options.getInteger("amount");
+  if (interaction.commandName === "userinfo") {
+    const member = await interaction.guild.members.fetch(interaction.user.id);
 
-  const voiceChannel = interaction.member.voice.channel;
+    const embed = new EmbedBuilder()
+      .setTitle("👤 User Info")
+      .setColor(0x00ae86)
+      .setThumbnail(member.user.displayAvatarURL())
+      .addFields(
+        { name: "👤 Username", value: member.user.tag, inline: true },
+        { name: "🆔 ID", value: member.user.id, inline: true },
 
-  if (!voiceChannel) {
-    return interaction.reply("❌ คุณต้องอยู่ใน voice ก่อน");
+        {
+          name: "🟢 Status",
+          value: getStatus(member.presence?.status),
+          inline: true,
+        },
+
+        {
+          name: "🎭 Roles",
+          value:
+            member.roles.cache
+              .filter((r) => r.id !== interaction.guild.id)
+              .map((r) => r.toString())
+              .join(", ") || "None",
+        },
+
+        {
+          name: "📅 Joined Server",
+          value: `<t:${Math.floor(member.joinedTimestamp / 1000)}:F>`,
+        },
+
+        {
+          name: "⏳ Account Created",
+          value: `<t:${Math.floor(member.user.createdTimestamp / 1000)}:F>`,
+        },
+      )
+      .setTimestamp();
+
+    return interaction.reply({ embeds: [embed] });
   }
 
-  const members = [...voiceChannel.members.values()].filter((m) => !m.user.bot);
+  if (interaction.commandName === "dice") {
+    const now = Date.now();
+    const cooldown = 2500; // 2.5 วิ
 
-  if (members.length < 1) {
-    return interaction.reply("❌ ต้องมีอย่างน้อย 1 คน");
-  }
+    if (diceCooldown.has(interaction.user.id)) {
+      const expire = diceCooldown.get(interaction.user.id) + cooldown;
 
-  // 🎲 roll
-  const results = members.map((member) => {
-    let rolls = [];
-
-    for (let i = 0; i < amount; i++) {
-      rolls.push(Math.floor(Math.random() * 6) + 1);
+      if (now < expire) {
+        return interaction.reply({
+          content: "⏳ รอแป๊บไอจูด",
+          ephemeral: true,
+        });
+      }
     }
 
-    const total = rolls.reduce((a, b) => a + b, 0);
+    diceCooldown.set(interaction.user.id, now);
+    const amount = interaction.options.getInteger("amount");
 
-    return {
-      name: member.displayName,
-      rolls,
-      total,
-    };
-  });
+    const voiceChannel = interaction.member.voice.channel;
 
-  const min = Math.min(...results.map((r) => r.total));
-  const losers = results.filter((r) => r.total === min);
-
-  let text = `🎲 Dice (${amount} ลูก)\n\n`;
-
-  results.forEach((r) => {
-    let diceText = r.rolls.map((n) => `${diceEmoji(n)}(${n})`).join(" + ");
-
-    text += `👤 ${r.name} → [${diceText}] = **${r.total}**\n`;
-  });
-
-  text += "\n💀 คนที่โดน:\n";
-
-  losers.forEach((l) => {
-    text += `👉 ${l.name}\n`;
-  });
-
- return interaction.reply({ content: text });
-}
-
-if (interaction.commandName === "diceall") {
-  const now = Date.now();
-  const cooldown = 2000;
-
-  if (diceCooldown.has(interaction.user.id)) {
-    const expire = diceCooldown.get(interaction.user.id) + cooldown;
-
-    if (now < expire) {
-      return interaction.reply({
-        content: "⏳ ใจเย็นดิ รอหน่อย",
-        ephemeral: true,
-      });
-    }
-  }
-
-  diceCooldown.set(interaction.user.id, now);
-
-  const amount = interaction.options.getInteger("amount");
-
-  const voiceChannel = interaction.member.voice.channel;
-
-  if (!voiceChannel) {
-    return interaction.reply("❌ คุณต้องอยู่ใน voice ก่อน");
-  }
-
-  const members = [...voiceChannel.members.values()].filter((m) => !m.user.bot);
-
-  if (members.length < 2) {
-    return interaction.reply("❌ ต้องมีอย่างน้อย 2 คน");
-  }
-
-  // 🎲 roll ทุกคน
-  const results = members.map((member) => {
-    let rolls = [];
-
-    for (let i = 0; i < amount; i++) {
-      rolls.push(Math.floor(Math.random() * 6) + 1);
+    if (!voiceChannel) {
+      return interaction.reply("❌ คุณต้องอยู่ใน voice ก่อน");
     }
 
-    const total = rolls.reduce((a, b) => a + b, 0);
+    const members = [...voiceChannel.members.values()].filter(
+      (m) => !m.user.bot,
+    );
 
-    return {
-      name: member.displayName,
-      rolls,
-      total,
-    };
-  });
+    if (members.length < 1) {
+      return interaction.reply("❌ ต้องมีอย่างน้อย 1 คน");
+    }
 
-  const min = Math.min(...results.map((r) => r.total));
-  const losers = results.filter((r) => r.total === min);
+    // 🎲 roll
+    const results = members.map((member) => {
+      let rolls = [];
 
- let text = `🎲 Dice ทั้งห้อง (${amount} ลูก)
+      for (let i = 0; i < amount; i++) {
+        rolls.push(Math.floor(Math.random() * 6) + 1);
+      }
 
+      const total = rolls.reduce((a, b) => a + b, 0);
+
+      return {
+        name: member.displayName,
+        rolls,
+        total,
+      };
+    });
+
+    const min = Math.min(...results.map((r) => r.total));
+    const losers = results.filter((r) => r.total === min);
+
+    let text = `🎲 Dice (${amount} ลูก)\n\n`;
+
+    results.forEach((r) => {
+      let diceText = r.rolls.map((n) => `${diceEmoji(n)}(${n})`).join(" + ");
+
+      text += `${r.name} → [${diceText}] = ${r.total}\n`;
+    });
+
+    text += "\nResult:\n";
+
+    losers.forEach((l) => {
+      text += `- ${l.name}\n`;
+    });
+
+    return interaction.reply({ content: text });
+  }
+
+  if (interaction.commandName === "diceall") {
+    const now = Date.now();
+    const cooldown = 2000;
+
+    if (diceCooldown.has(interaction.user.id)) {
+      const expire = diceCooldown.get(interaction.user.id) + cooldown;
+
+      if (now < expire) {
+        return interaction.reply({
+          content: "⏳ ใจเย็นดิ รอหน่อย",
+          ephemeral: true,
+        });
+      }
+    }
+
+    diceCooldown.set(interaction.user.id, now);
+
+    const amount = interaction.options.getInteger("amount");
+
+    const voiceChannel = interaction.member.voice.channel;
+
+    if (!voiceChannel) {
+      return interaction.reply("❌ คุณต้องอยู่ใน voice ก่อน");
+    }
+
+    const members = [...voiceChannel.members.values()].filter(
+      (m) => !m.user.bot,
+    );
+
+    if (members.length < 2) {
+      return interaction.reply("❌ ต้องมีอย่างน้อย 2 คน");
+    }
+
+    // 🎲 roll ทุกคน
+    const results = members.map((member) => {
+      let rolls = [];
+
+      for (let i = 0; i < amount; i++) {
+        rolls.push(Math.floor(Math.random() * 6) + 1);
+      }
+
+      const total = rolls.reduce((a, b) => a + b, 0);
+
+      return {
+        name: member.displayName,
+        rolls,
+        total,
+      };
+    });
+
+    const min = Math.min(...results.map((r) => r.total));
+    const losers = results.filter((r) => r.total === min);
+
+    let text = `🎲 Dice ทั้งห้อง (${amount} ลูก)
+
+\`\`\`
 ┌──────────────┬────────────────────┬───────┐
 │ Player       │ Dice               │ Total │
 ├──────────────┼────────────────────┼───────┤
 `;
 
- results.forEach((r) => {
-   let diceText = r.rolls.map((n) => `${diceEmoji(n)}(${n})`).join(" + ");
+    results.forEach((r) => {
+      let diceText = r.rolls.map((n) => `${diceEmoji(n)}(${n})`).join(" + ");
 
-   text += `│ ${r.name.slice(0, 10).padEnd(12)} │ ${diceText.padEnd(18)} │ ${r.total
-     .toString()
-     .padEnd(5)} │\n`;
- });
-
- text += `└──────────────┴────────────────────┴───────┘\n`;
-
-  // ❗ ถ้าแต้มเท่ากันหมด
-  if (losers.length === members.length) {
-    text += "\n😂 แต้มเท่ากันหมด ไม่มีคนโดน!";
-  } else {
-    text += "\n💀 คนที่โดน:\n";
-    losers.forEach((l) => {
-      text += `👉 **${l.name}**\n`;
+      text += `│ ${r.name.slice(0, 10).padEnd(12)} │ ${diceText.padEnd(18)} │ ${r.total
+        .toString()
+        .padEnd(5)} │\n`;
     });
+
+    text += `└──────────────┴────────────────────┴───────┘\n\`\`\`\n`;
+
+    // ❗ ถ้าแต้มเท่ากันหมด
+    if (losers.length === members.length) {
+      text += "\nResult: Draw";
+    } else {
+      text += "\nResult:\n";
+      losers.forEach((l) => {
+        text += `- ${l.name}\n`;
+      });
+    }
+
+    await interaction.reply("🎲 กำลังทอย...");
+
+    const delay = Math.floor(Math.random() * 1000) + 800;
+
+    setTimeout(() => {
+      interaction.editReply(text);
+    }, delay);
   }
-
-  await interaction.reply("🎲 กำลังทอย...");
-
-  const delay = Math.floor(Math.random() * 1000) + 800;
-
-  setTimeout(() => {
-    interaction.editReply(text);
-  }, delay);
-}
-
 });
 
 // ฟังก์ชันสำหรับแสดง Leaderboard
@@ -497,13 +501,13 @@ async function sendLogMessage(state, durationSeconds) {
     return;
   }
 
- const nickname = state.member?.displayName;
- const usernameRaw = state.member?.user?.username;
+  const nickname = state.member?.displayName;
+  const usernameRaw = state.member?.user?.username;
 
- const username =
-   nickname && nickname !== usernameRaw
-     ? `${nickname} (${usernameRaw})`
-     : usernameRaw || "Unknown";
+  const username =
+    nickname && nickname !== usernameRaw
+      ? `${nickname} (${usernameRaw})`
+      : usernameRaw || "Unknown";
   const channelName = state.channel?.name || "Unknown";
   const durationFormatted = formatDuration(durationSeconds);
   const guildName = state.guild?.name || "Unknown Server";
@@ -578,9 +582,9 @@ async function sendJoinLog(state) {
     .setTimestamp();
 
   await logChannel.send({
-  content: `🔍 ${username}`,
-  embeds: [embed],
-});
+    content: `🔍 ${username}`,
+    embeds: [embed],
+  });
 }
 
 // ฟังก์ชันจัดรูปแบบ duration
@@ -661,29 +665,29 @@ client.on("messageDelete", async (message) => {
       .fetch(CONFIG.LOG_DELETE_CHANNEL_ID)
       .catch(() => null);
 
-      let deletedBy = "Unknown";
+    let deletedBy = "Unknown";
 
-      try {
-        const fetchedLogs = await message.guild.fetchAuditLogs({
-          limit: 5,
-          type: 72,
-        });
+    try {
+      const fetchedLogs = await message.guild.fetchAuditLogs({
+        limit: 5,
+        type: 72,
+      });
 
-        const deletionLog = fetchedLogs.entries.find((entry) => {
-          return (
-            entry.target?.id === message.author?.id &&
-            Date.now() - entry.createdTimestamp < 5000
-          );
-        });
+      const deletionLog = fetchedLogs.entries.find((entry) => {
+        return (
+          entry.target?.id === message.author?.id &&
+          Date.now() - entry.createdTimestamp < 5000
+        );
+      });
 
-        if (deletionLog) {
-          deletedBy = deletionLog.executor?.tag || "Unknown";
-        } else {
-          deletedBy = message.author?.tag || "Unknown (self delete)";
-        }
-      } catch (err) {
-        console.log("⚠️ Cannot fetch audit logs");
+      if (deletionLog) {
+        deletedBy = deletionLog.executor?.tag || "Unknown";
+      } else {
+        deletedBy = message.author?.tag || "Unknown (self delete)";
       }
+    } catch (err) {
+      console.log("⚠️ Cannot fetch audit logs");
+    }
 
     if (!logChannel) {
       console.log("⚠️ Delete log channel not found");
@@ -749,7 +753,6 @@ client.on("messageDelete", async (message) => {
       content: `🔍 ${message.author?.tag || "Unknown"}`,
       embeds: [embed],
     });
-
   } catch (err) {
     console.error("Delete log error:", err);
   }
