@@ -6,6 +6,10 @@ require("http")
   .createServer((req, res) => res.end("OK"))
   .listen(process.env.PORT || 3000);
 
+  function diceEmoji(n) {
+    return ["⚀", "⚁", "⚂", "⚃", "⚄", "⚅"][n - 1];
+  }
+
 process.on("uncaughtException", console.error);
 process.on("unhandledRejection", console.error);
 
@@ -274,7 +278,9 @@ if (interaction.commandName === "dice") {
   let text = `🎲 Dice (${amount} ลูก)\n\n`;
 
   results.forEach((r) => {
-    text += `👤 ${r.name} → [${r.rolls.join(" + ")}] = **${r.total}**\n`;
+    let diceText = r.rolls.map((n) => `${diceEmoji(n)}(${n})`).join(" + ");
+
+    text += `👤 ${r.name} → [${diceText}] = **${r.total}**\n`;
   });
 
   text += "\n💀 คนที่โดน:\n";
@@ -337,12 +343,22 @@ if (interaction.commandName === "diceall") {
   const min = Math.min(...results.map((r) => r.total));
   const losers = results.filter((r) => r.total === min);
 
-  let text = `🎲 Dice ทั้งห้อง (${amount} ลูก)\n\n`;
+ let text = `🎲 Dice ทั้งห้อง (${amount} ลูก)
 
-  results.forEach((r) => {
-    text += `👤 **${r.name}**
-🎲 ${r.rolls.join(" + ")} = **${r.total}**\n\n`;
-  });
+┌──────────────┬────────────────────┬───────┐
+│ Player       │ Dice               │ Total │
+├──────────────┼────────────────────┼───────┤
+`;
+
+ results.forEach((r) => {
+   let diceText = r.rolls.map((n) => `${diceEmoji(n)}(${n})`).join(" + ");
+
+   text += `│ ${r.name.slice(0, 10).padEnd(12)} │ ${diceText.padEnd(18)} │ ${r.total
+     .toString()
+     .padEnd(5)} │\n`;
+ });
+
+ text += `└──────────────┴────────────────────┴───────┘\n`;
 
   // ❗ ถ้าแต้มเท่ากันหมด
   if (losers.length === members.length) {
