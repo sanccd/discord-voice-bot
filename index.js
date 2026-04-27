@@ -249,47 +249,24 @@ client.on("interactionCreate", async (interaction) => {
       return interaction.reply("❌ คุณต้องอยู่ใน voice ก่อน");
     }
 
-    const members = [...voiceChannel.members.values()].filter(
-      (m) => !m.user.bot,
-    );
-
-    if (members.length < 1) {
-      return interaction.reply("❌ ต้องมีอย่างน้อย 1 คน");
-    }
+    const member = interaction.member;
 
     // 🎲 roll
-    const results = members.map((member) => {
-      let rolls = [];
+    let rolls = [];
 
-      for (let i = 0; i < amount; i++) {
-        rolls.push(Math.floor(Math.random() * 6) + 1);
-      }
+    for (let i = 0; i < amount; i++) {
+      rolls.push(Math.floor(Math.random() * 6) + 1);
+    }
 
-      const total = rolls.reduce((a, b) => a + b, 0);
+    const total = rolls.reduce((a, b) => a + b, 0);
 
-      return {
-        name: member.displayName,
-        rolls,
-        total,
-      };
-    });
+    let diceText = rolls.map((n) => `${diceEmoji(n)}(${n})`).join(" + ");
 
-    const min = Math.min(...results.map((r) => r.total));
-    const losers = results.filter((r) => r.total === min);
+    let text = `Dice (${amount} ลูก)\n\n`;
 
-    let text = `🎲 Dice (${amount} ลูก)\n\n`;
+    text += `${member.displayName}\n[${diceText}] = ${total}\n`;
 
-    results.forEach((r) => {
-      let diceText = r.rolls.map((n) => `${diceEmoji(n)}(${n})`).join(" + ");
-
-      text += `${r.name} → [${diceText}] = ${r.total}\n`;
-    });
-
-    text += "\nResult:\n";
-
-    losers.forEach((l) => {
-      text += `- ${l.name}\n`;
-    });
+    text += `\nResult:\n- ${member.displayName}`;
 
     return interaction.reply({ content: text });
   }
