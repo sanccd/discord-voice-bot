@@ -352,13 +352,23 @@ client.on("interactionCreate", async (interaction) => {
       });
     }
 
-    await interaction.reply("🎲 กำลังทอย...");
+    await interaction.deferReply();
 
-    const delay = Math.floor(Math.random() * 1000) + 800;
+    // เริ่ม animation
+    await interaction.editReply("🎲 กำลังทอย...");
 
-    setTimeout(() => {
-      interaction.editReply(text);
-    }, delay);
+    const frames = ["🎲 .", "🎲 ..", "🎲 ...", "🎲 ทอยแล้ววว..."];
+
+    for (let i = 0; i < frames.length; i++) {
+      await new Promise((res) => setTimeout(res, 300));
+      await interaction.editReply(frames[i]);
+    }
+
+    // หน่วงก่อนเฉลย
+    await new Promise((res) => setTimeout(res, 400));
+
+    // แสดงผลจริง
+    await interaction.editReply(text);
   }
 });
 
