@@ -141,7 +141,7 @@ client.once("clientReady", async () => {
     // 🔥 PUBG Tracker
   setInterval(() => {
     testPUBG(client);
-  }, 300000);
+  }, 60000);
 
   testPUBG(client);
 });
