@@ -47,6 +47,7 @@ const CONFIG = {
   LOG_CHANNEL_ID: process.env.LOG_CHANNEL_ID,
   LOG_JOIN_CHANNEL_ID: process.env.LOG_JOIN_CHANNEL_ID,
   LOG_DELETE_CHANNEL_ID: process.env.LOG_DELETE_CHANNEL_ID,
+  LOG_EDIT_CHANNEL_ID: process.env.LOG_EDIT_CHANNEL_ID,
 };
 if (!CONFIG.TOKEN) {
   console.error("❌ TOKEN ไม่มี!");
@@ -744,5 +745,7 @@ client.on("messageDelete", async (message) => {
     console.error("Delete log error:", err);
   }
 });
+
+require("./events/messageUpdate")(client, CONFIG);
 
 startBot();
