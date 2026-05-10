@@ -1,6 +1,8 @@
 require("dotenv").config();
+const testPUBG = require("./services/pubgTracker");
 
 const diceCooldown = new Map();
+
 
 require("http")
   .createServer((req, res) => res.end("OK"))
@@ -136,6 +138,12 @@ client.once("clientReady", async () => {
       );
     }
   });
+    // 🔥 PUBG Tracker
+  setInterval(() => {
+    testPUBG(client);
+  }, 300000);
+
+  testPUBG(client);
 });
 
 // Event: จัดการ Slash Commands
