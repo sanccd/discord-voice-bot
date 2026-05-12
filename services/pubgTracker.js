@@ -212,9 +212,17 @@ async function testPUBG(client) {
       .map((player) => {
         const s = player.attributes.stats;
 
-        return `• ${s.name} — ${s.kills}K / ${Math.round(s.damageDealt)} DMG`;
+        return s.name === mvpStats.name
+          ? `• **${s.name}** — ${s.kills}K / ${Math.round(s.damageDealt)} DMG 🔥`
+          : `• ${s.name} — ${s.kills}K / ${Math.round(s.damageDealt)} DMG`;
       })
       .join("\n");
+
+    // 💀 total kills
+    const totalKills = teamPlayers.reduce(
+      (sum, player) => sum + player.attributes.stats.kills,
+      0,
+    );
 
     // 🎨 embed
     const embed = new EmbedBuilder()
@@ -229,8 +237,8 @@ async function testPUBG(client) {
       .setThumbnail(mapImages[mapName])
       .setDescription(
         stats.winPlace === 1
-          ? `🐔 **WINNER WINNER CHICKEN DINNER!**\n\n🗺️ ${mapName}\n🎮 ${mode}\n🥇 Rank #1`
-          : `🗺️ ${mapName}\n🎮 ${mode}\n🏅 Rank #${stats.winPlace}`,
+          ? `🐔 **WINNER WINNER CHICKEN DINNER!**\n\n🗺️ ${mapName}\n🎮 ${mode}\n🥇 Rank #1\n💀 Team Kills: ${totalKills}`
+          : `🗺️ ${mapName}\n🎮 ${mode}\n🏅 Rank #${stats.winPlace}\n💀 Team Kills: ${totalKills}`,
       )
       .addFields(
         {
@@ -272,7 +280,6 @@ async function testPUBG(client) {
 
     lastMatchId = latestMatch.id;
     console.log("✅ PUBG SENT TO DISCORD");
-
   } catch (err) {
     console.log("❌ PUBG API Error");
 
