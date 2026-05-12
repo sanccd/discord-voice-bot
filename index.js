@@ -138,6 +138,7 @@ client.once("clientReady", async () => {
       );
     }
   });
+  
     // 🔥 PUBG Tracker
   setInterval(() => {
     testPUBG(client);

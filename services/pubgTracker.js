@@ -227,7 +227,11 @@ async function testPUBG(client) {
             : 0xcd7f32,
       )
       .setThumbnail(mapImages[mapName])
-      .setDescription(`🗺️ ${mapName}\n🎮 ${mode}\n🏅 Rank #${stats.winPlace}`)
+      .setDescription(
+        stats.winPlace === 1
+          ? `🐔 **WINNER WINNER CHICKEN DINNER!**\n\n🗺️ ${mapName}\n🎮 ${mode}\n🥇 Rank #1`
+          : `🗺️ ${mapName}\n🎮 ${mode}\n🏅 Rank #${stats.winPlace}`,
+      )
       .addFields(
         {
           name: "🎯 Combat",
