@@ -143,7 +143,12 @@ client.once("clientReady", async () => {
       );
     }
   });
-  
+
+  // 🔊 ตั้ง baseline ของ MEMBER_DISCONNECT audit log ก่อนเริ่มตรวจจับ Voice Kick
+  guilds.forEach((guild) => {
+    initVoiceKickBaseline(guild);
+  });
+
     // 🔥 PUBG Tracker
   setInterval(() => {
     testPUBG(client);
@@ -473,7 +478,7 @@ client.on("voiceStateUpdate", async (oldState, newState) => {
     const durationSeconds = await saveLeaveSession(userId, leaveTime);
 
     const kickEntry = CONFIG.LOG_VOICE_KICK_CHANNEL_ID
-      ? await findVoiceKickAuditEntry(oldState.guild, leaveTime)
+      ? await findVoiceKickAuditEntry(oldState.guild)
       : null;
 
     if (kickEntry) {
@@ -646,75 +651,112 @@ async function sendMoveLog(oldState, newState) {
   });
 }
 
-// ตรวจสอบ Audit Log ว่า user ถูกเตะออกจาก Voice หรือไม่
-// Discord ไม่ผูก target_id กับ MEMBER_DISCONNECT audit log entry (อาจเตะได้หลายคนพร้อมกัน)
-// จึงใช้วิธีจับคู่ entry ล่าสุดที่เวลาใกล้เคียงกับ voiceStateUpdate แทน
+// ตรวจสอบว่า user ถูกเตะออกจาก Voice หรือไม่ โดยติดตามการเปลี่ยนแปลงของ
+// extra.count บน MEMBER_DISCONNECT audit log entry ล่าสุด (ไม่ใช้ createdTimestamp
+// เพราะ Discord "stack" การ disconnect ซ้ำของ executor เดิมเข้า entry เดียวกัน
+// โดยไม่ refresh เวลา — ยืนยันจากการทดสอบจริงและ discord-api-docs#2280)
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 let auditLogPermissionWarned = false;
 
-async function findVoiceKickAuditEntry(guild, leaveTimestamp) {
-  if (!guild) return null;
+// guildId -> { entryId: string|null, count: number }
+const voiceDisconnectBaseline = new Map();
 
-  const KICK_MATCH_WINDOW_MS = 8000; // เวลาที่ยอมรับได้ระหว่าง leave event กับ audit log entry
-  const RETRY_DELAYS_MS = [0, 1200]; // ลองทันที แล้วลองซ้ำอีกครั้งถ้า audit log ยังมาไม่ทัน (race condition)
+// guildId -> Promise ล่าสุดในคิว กันหลาย leave event ในกิลด์เดียวกันแย่งกันอ่าน/เขียน baseline พร้อมกัน
+const voiceKickCheckQueue = new Map();
+
+async function fetchLatestDisconnectEntry(guild) {
+  const logs = await guild.fetchAuditLogs({
+    type: AuditLogEvent.MemberDisconnect,
+    limit: 1,
+  });
+
+  return logs.entries.first() ?? null;
+}
+
+// เรียกตอน bot พร้อมใช้งาน เพื่อจำ count ปัจจุบันไว้เป็น baseline
+// กัน count ที่มีอยู่ก่อน bot start ถูกตีความว่าเป็น kick ใหม่
+async function initVoiceKickBaseline(guild) {
+  if (!CONFIG.LOG_VOICE_KICK_CHANNEL_ID) return;
+
+  try {
+    const entry = await fetchLatestDisconnectEntry(guild);
+
+    voiceDisconnectBaseline.set(guild.id, {
+      entryId: entry?.id ?? null,
+      count: entry ? Number(entry.extra?.count ?? 1) : 0,
+    });
+  } catch (error) {
+    if (error.code === 50013) {
+      if (!auditLogPermissionWarned) {
+        console.log("⚠️ Bot ไม่มีสิทธิ์ View Audit Log — ข้ามการตรวจจับ Voice Kick");
+        auditLogPermissionWarned = true;
+      }
+    } else {
+      console.error("⚠️ Error initializing voice kick baseline:", error.message);
+    }
+  }
+}
+
+// เทียบ count ล่าสุดกับ baseline คืน audit log entry (มี .executor / .reason) ถ้ามั่นใจว่าเป็น kick, ไม่งั้นคืน null
+async function checkVoiceKickDelta(guild) {
+  // ยังไม่มี baseline (เช่น bot เพิ่ง start ยัง init ไม่เสร็จ หรือไม่มีสิทธิ์อ่าน) → conservative ไม่ถือเป็น kick
+  if (!voiceDisconnectBaseline.has(guild.id)) return null;
+
+  const RETRY_DELAYS_MS = [0, 1200]; // เผื่อ audit log เขียนไม่ทัน voiceStateUpdate
 
   for (const delay of RETRY_DELAYS_MS) {
     if (delay) await sleep(delay);
 
+    let entry;
+
     try {
-      const logs = await guild.fetchAuditLogs({
-        type: AuditLogEvent.MemberDisconnect,
-        limit: 5,
-      });
-
-      // 🐛 DEBUG: ดูข้อมูลจริงที่ Discord ส่งกลับมา (ชั่วคราว)
-      console.log(
-        `VOICE KICK AUDIT DEBUG | delay=${delay}ms leaveTimestamp=${leaveTimestamp} window=${KICK_MATCH_WINDOW_MS}ms`,
-      );
-      console.log(`Found entries: ${logs.entries.size}`);
-
-      logs.entries.forEach((e) => {
-        const diffMs = leaveTimestamp - e.createdTimestamp;
-        let extraSafe;
-        try {
-          extraSafe = JSON.stringify(e.extra);
-        } catch {
-          extraSafe = String(e.extra);
-        }
-
-        console.log(
-          `  entry -> actionType=${e.actionType} id=${e.id} createdTimestamp=${e.createdTimestamp} ` +
-            `diffMs=${diffMs} executorId=${e.executorId} executorUsername=${e.executor?.username ?? "N/A"} ` +
-            `targetId=${e.targetId ?? "null"} targetUsername=${e.target?.username ?? "N/A"} ` +
-            `reason=${e.reason ?? "null"} extra=${extraSafe}`,
-        );
-      });
-
-      const entry = logs.entries.find(
-        (e) => Math.abs(leaveTimestamp - e.createdTimestamp) <= KICK_MATCH_WINDOW_MS,
-      );
-
-      if (entry) {
-        console.log(`VOICE KICK AUDIT DEBUG | MATCHED entry id=${entry.id}`);
-        return entry;
-      }
+      entry = await fetchLatestDisconnectEntry(guild);
     } catch (error) {
-      if (error.code === 50013) {
-        // ❌ บอทไม่มีสิทธิ์ View Audit Log
-        if (!auditLogPermissionWarned) {
-          console.log("⚠️ Bot ไม่มีสิทธิ์ View Audit Log — ข้ามการตรวจจับ Voice Kick");
-          auditLogPermissionWarned = true;
-        }
-        return null;
-      }
-
       console.error("⚠️ Error fetching audit logs for voice kick:", error.message);
+      continue;
     }
+
+    if (!entry) return null; // ไม่เคยมี MEMBER_DISCONNECT ใน guild นี้เลย
+
+    const baseline = voiceDisconnectBaseline.get(guild.id);
+    const currentCount = Number(entry.extra?.count ?? 1);
+
+    // entry id เปลี่ยน = entry ใหม่ทั้งอัน ไม่เอาของเก่ามาลบเทียบ ถือว่า count ทั้งหมดคือของใหม่
+    const delta = entry.id !== baseline.entryId ? currentCount : currentCount - baseline.count;
+
+    // อัปเดต baseline ทุกครั้งที่เห็นการเปลี่ยนแปลง กันนับซ้ำในรอบถัดไป
+    voiceDisconnectBaseline.set(guild.id, { entryId: entry.id, count: currentCount });
+
+    if (delta === 1) {
+      return entry; // มี disconnect ใหม่เกิดขึ้นพอดี 1 ครั้ง ตรงกับ leave event ที่เพิ่งเกิด
+    }
+
+    if (delta > 1) {
+      console.log(
+        `⚠️ Voice kick ambiguous: entry ${entry.id} count เพิ่มขึ้น ${delta} พร้อมกัน — ไม่สามารถระบุ target ได้แน่นอน, fallback เป็น leave`,
+      );
+      return null;
+    }
+
+    // delta <= 0 → ยังไม่เห็นการเปลี่ยนแปลง ลอง retry รอบถัดไป
   }
 
-  console.log("NO MATCHING MEMBER_DISCONNECT ENTRY");
-  return null; // ไม่พบ entry ที่ตรง = ถือว่าออกเอง
+  return null; // ไม่พบการเปลี่ยนแปลง = ถือว่าออกเอง
+}
+
+// serialize การเช็คต่อ guild ผ่านคิว กันสอง leave event พร้อมกันแย่งอ่าน/เขียน baseline
+function findVoiceKickAuditEntry(guild) {
+  if (!guild) return Promise.resolve(null);
+
+  const guildId = guild.id;
+  const prevInQueue = voiceKickCheckQueue.get(guildId) ?? Promise.resolve(null);
+
+  const run = prevInQueue.catch(() => null).then(() => checkVoiceKickDelta(guild));
+
+  voiceKickCheckQueue.set(guildId, run.catch(() => null));
+
+  return run;
 }
 
 async function sendVoiceKickLog(oldState, kickEntry) {
