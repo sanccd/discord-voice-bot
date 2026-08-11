@@ -33,6 +33,8 @@ const {
 
 initDatabase();
 
+//
+
 // สร้าง Client พร้อม Intents
 const client = new Client({
   intents: [
