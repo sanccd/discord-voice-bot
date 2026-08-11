@@ -758,7 +758,7 @@ async function checkVoiceKickDelta(guild) {
   // ยังไม่มี baseline (เช่น bot เพิ่ง start ยัง init ไม่เสร็จ หรือไม่มีสิทธิ์อ่าน) → conservative ไม่ถือเป็น kick
   if (!voiceDisconnectBaseline.has(guild.id)) return null;
 
-  const RETRY_DELAYS_MS = [0, 1200]; // เผื่อ audit log เขียนไม่ทัน voiceStateUpdate
+  const RETRY_DELAYS_MS = [0, 200]; // เผื่อ audit log เขียนไม่ทัน voiceStateUpdate
 
   for (const delay of RETRY_DELAYS_MS) {
     if (delay) await sleep(delay);
