@@ -50,6 +50,7 @@ const CONFIG = {
   LOG_JOIN_CHANNEL_ID: process.env.LOG_JOIN_CHANNEL_ID,
   LOG_DELETE_CHANNEL_ID: process.env.LOG_DELETE_CHANNEL_ID,
   LOG_EDIT_CHANNEL_ID: process.env.LOG_EDIT_CHANNEL_ID,
+  LOG_MOVE_CHANNEL_ID: process.env.LOG_MOVE_CHANNEL_ID,
 };
 if (!CONFIG.TOKEN) {
   console.error("❌ TOKEN ไม่มี!");
@@ -484,6 +485,7 @@ client.on("voiceStateUpdate", async (oldState, newState) => {
 
     await saveLeaveSession(userId, leaveTime);
     await saveJoinSession(userId, guildId, Date.now());
+    await sendMoveLog(oldState, newState);
   }
 });
 
@@ -569,6 +571,55 @@ async function sendJoinLog(state) {
 
       { name: "👤 User", value: username, inline: true },
       { name: "📢 Channel", value: channelName, inline: true },
+      {
+        name: "⏰ Time",
+        value: `<t:${Math.floor(Date.now() / 1000)}:F> (<t:${Math.floor(Date.now() / 1000)}:R>)`,
+        inline: true,
+      },
+    )
+    .setFooter({ text: "Voice Tracker" })
+    .setTimestamp();
+
+  await logChannel.send({
+    content: `🔍 ${username}`,
+    embeds: [embed],
+  });
+}
+
+async function sendMoveLog(oldState, newState) {
+  const logChannel = await client.channels
+    .fetch(CONFIG.LOG_MOVE_CHANNEL_ID)
+    .catch(() => null);
+
+  if (!logChannel) {
+    console.log("⚠️ Move log channel not found");
+    return;
+  }
+
+  const nickname = newState.member?.displayName;
+  const usernameRaw = newState.member?.user?.username;
+
+  const username =
+    nickname && nickname !== usernameRaw
+      ? `${nickname} (${usernameRaw})`
+      : usernameRaw || "Unknown";
+  const fromChannelName = oldState.channel?.name || "Unknown";
+  const toChannelName = newState.channel?.name || "Unknown";
+  const guildName = newState.guild?.name || "Unknown Server";
+
+  const embed = new EmbedBuilder()
+    .setTitle("🔄 Voice Channel Move")
+    .setColor(0xfacc15) // 🔥 เหลือง soft
+    .setThumbnail(newState.guild.iconURL())
+    .addFields(
+      {
+        name: "🌐 Server",
+        value: guildName,
+      },
+
+      { name: "👤 User", value: username, inline: true },
+      { name: "📤 From", value: fromChannelName, inline: true },
+      { name: "📥 To", value: toChannelName, inline: true },
       {
         name: "⏰ Time",
         value: `<t:${Math.floor(Date.now() / 1000)}:F> (<t:${Math.floor(Date.now() / 1000)}:R>)`,
