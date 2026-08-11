@@ -668,11 +668,37 @@ async function findVoiceKickAuditEntry(guild, leaveTimestamp) {
         limit: 5,
       });
 
+      // 🐛 DEBUG: ดูข้อมูลจริงที่ Discord ส่งกลับมา (ชั่วคราว)
+      console.log(
+        `VOICE KICK AUDIT DEBUG | delay=${delay}ms leaveTimestamp=${leaveTimestamp} window=${KICK_MATCH_WINDOW_MS}ms`,
+      );
+      console.log(`Found entries: ${logs.entries.size}`);
+
+      logs.entries.forEach((e) => {
+        const diffMs = leaveTimestamp - e.createdTimestamp;
+        let extraSafe;
+        try {
+          extraSafe = JSON.stringify(e.extra);
+        } catch {
+          extraSafe = String(e.extra);
+        }
+
+        console.log(
+          `  entry -> actionType=${e.actionType} id=${e.id} createdTimestamp=${e.createdTimestamp} ` +
+            `diffMs=${diffMs} executorId=${e.executorId} executorUsername=${e.executor?.username ?? "N/A"} ` +
+            `targetId=${e.targetId ?? "null"} targetUsername=${e.target?.username ?? "N/A"} ` +
+            `reason=${e.reason ?? "null"} extra=${extraSafe}`,
+        );
+      });
+
       const entry = logs.entries.find(
         (e) => Math.abs(leaveTimestamp - e.createdTimestamp) <= KICK_MATCH_WINDOW_MS,
       );
 
-      if (entry) return entry;
+      if (entry) {
+        console.log(`VOICE KICK AUDIT DEBUG | MATCHED entry id=${entry.id}`);
+        return entry;
+      }
     } catch (error) {
       if (error.code === 50013) {
         // ❌ บอทไม่มีสิทธิ์ View Audit Log
@@ -687,6 +713,7 @@ async function findVoiceKickAuditEntry(guild, leaveTimestamp) {
     }
   }
 
+  console.log("NO MATCHING MEMBER_DISCONNECT ENTRY");
   return null; // ไม่พบ entry ที่ตรง = ถือว่าออกเอง
 }
 
