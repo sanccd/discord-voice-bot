@@ -20,6 +20,7 @@ const {
   GatewayIntentBits,
   SlashCommandBuilder,
   EmbedBuilder,
+  AuditLogEvent,
 } = require("discord.js");
 const {
   initDatabase,
@@ -51,6 +52,7 @@ const CONFIG = {
   LOG_DELETE_CHANNEL_ID: process.env.LOG_DELETE_CHANNEL_ID,
   LOG_EDIT_CHANNEL_ID: process.env.LOG_EDIT_CHANNEL_ID,
   LOG_MOVE_CHANNEL_ID: process.env.LOG_MOVE_CHANNEL_ID,
+  LOG_VOICE_KICK_CHANNEL_ID: process.env.LOG_VOICE_KICK_CHANNEL_ID,
 };
 if (!CONFIG.TOKEN) {
   console.error("❌ TOKEN ไม่มี!");
@@ -460,7 +462,7 @@ client.on("voiceStateUpdate", async (oldState, newState) => {
     await sendJoinLog(newState);
   }
 
-  // 🔴 ออก voice
+  // 🔴 ออก voice (อาจเป็นออกเอง หรือถูกเตะ)
   else if (oldState.channelId && !newState.channelId) {
     console.log("🔴 LEAVE");
 
@@ -468,7 +470,14 @@ client.on("voiceStateUpdate", async (oldState, newState) => {
 
     const durationSeconds = await saveLeaveSession(userId, leaveTime);
 
-    if (durationSeconds) {
+    const kickEntry = CONFIG.LOG_VOICE_KICK_CHANNEL_ID
+      ? await findVoiceKickAuditEntry(oldState.guild, leaveTime)
+      : null;
+
+    if (kickEntry) {
+      console.log("🔊 VOICE KICK");
+      await sendVoiceKickLog(oldState, kickEntry);
+    } else if (durationSeconds) {
       await sendLogMessage(oldState, durationSeconds);
     }
   }
@@ -631,6 +640,123 @@ async function sendMoveLog(oldState, newState) {
 
   await logChannel.send({
     content: `🔍 ${username}`,
+    embeds: [embed],
+  });
+}
+
+// ตรวจสอบ Audit Log ว่า user ถูกเตะออกจาก Voice หรือไม่
+// Discord ไม่ผูก target_id กับ MEMBER_DISCONNECT audit log entry (อาจเตะได้หลายคนพร้อมกัน)
+// จึงใช้วิธีจับคู่ entry ล่าสุดที่เวลาใกล้เคียงกับ voiceStateUpdate แทน
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+let auditLogPermissionWarned = false;
+
+async function findVoiceKickAuditEntry(guild, leaveTimestamp) {
+  if (!guild) return null;
+
+  const KICK_MATCH_WINDOW_MS = 8000; // เวลาที่ยอมรับได้ระหว่าง leave event กับ audit log entry
+  const RETRY_DELAYS_MS = [0, 1200]; // ลองทันที แล้วลองซ้ำอีกครั้งถ้า audit log ยังมาไม่ทัน (race condition)
+
+  for (const delay of RETRY_DELAYS_MS) {
+    if (delay) await sleep(delay);
+
+    try {
+      const logs = await guild.fetchAuditLogs({
+        type: AuditLogEvent.MemberDisconnect,
+        limit: 5,
+      });
+
+      const entry = logs.entries.find(
+        (e) => Math.abs(leaveTimestamp - e.createdTimestamp) <= KICK_MATCH_WINDOW_MS,
+      );
+
+      if (entry) return entry;
+    } catch (error) {
+      if (error.code === 50013) {
+        // ❌ บอทไม่มีสิทธิ์ View Audit Log
+        if (!auditLogPermissionWarned) {
+          console.log("⚠️ Bot ไม่มีสิทธิ์ View Audit Log — ข้ามการตรวจจับ Voice Kick");
+          auditLogPermissionWarned = true;
+        }
+        return null;
+      }
+
+      console.error("⚠️ Error fetching audit logs for voice kick:", error.message);
+    }
+  }
+
+  return null; // ไม่พบ entry ที่ตรง = ถือว่าออกเอง
+}
+
+async function sendVoiceKickLog(oldState, kickEntry) {
+  const logChannel = await client.channels
+    .fetch(CONFIG.LOG_VOICE_KICK_CHANNEL_ID)
+    .catch(() => null);
+
+  if (!logChannel) {
+    console.log("⚠️ Voice kick log channel not found");
+    return;
+  }
+
+  const targetNickname = oldState.member?.displayName;
+  const targetUsernameRaw = oldState.member?.user?.username;
+
+  const targetName =
+    targetNickname && targetNickname !== targetUsernameRaw
+      ? `${targetNickname} (${targetUsernameRaw})`
+      : targetUsernameRaw || "ไม่ทราบ";
+
+  let executorName = "ไม่ทราบ";
+
+  try {
+    const executor = kickEntry.executor;
+
+    if (executor) {
+      const executorMember = await oldState.guild.members
+        .fetch(executor.id)
+        .catch(() => null);
+
+      const execNickname = executorMember?.displayName;
+      const execUsernameRaw = executor.username;
+
+      executorName =
+        execNickname && execNickname !== execUsernameRaw
+          ? `${execNickname} (${execUsernameRaw})`
+          : execUsernameRaw || "ไม่ทราบ";
+    }
+  } catch (error) {
+    console.error("⚠️ Error resolving voice kick executor:", error.message);
+  }
+
+  const reason = kickEntry.reason || "ไม่ระบุ";
+  const channelName = oldState.channel?.name || "Unknown";
+  const guildName = oldState.guild?.name || "Unknown Server";
+
+  const embed = new EmbedBuilder()
+    .setTitle("🔊 Voice Kick")
+    .setColor(0xf97316) // 🔥 ส้ม soft
+    .setThumbnail(oldState.guild.iconURL())
+    .addFields(
+      {
+        name: "🌐 Server",
+        value: guildName,
+      },
+
+      { name: "👤 ผู้ถูกเตะ", value: targetName, inline: true },
+      { name: "🛡️ ผู้ดำเนินการ", value: executorName, inline: true },
+      { name: "📢 ห้อง", value: channelName, inline: true },
+      { name: "📝 Reason", value: reason, inline: true },
+      {
+        name: "⏰ Time",
+        value: `<t:${Math.floor(Date.now() / 1000)}:F> (<t:${Math.floor(Date.now() / 1000)}:R>)`,
+        inline: true,
+      },
+    )
+    .setFooter({ text: "Voice Tracker" })
+    .setTimestamp();
+
+  await logChannel.send({
+    content: `🔍 ${targetName}`,
     embeds: [embed],
   });
 }
