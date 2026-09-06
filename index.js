@@ -3,7 +3,6 @@ const testPUBG = require("./services/pubgTracker");
 
 const diceCooldown = new Map();
 
-
 require("http")
   .createServer((req, res) => res.end("OK"))
   .listen(process.env.PORT || 3000);
@@ -34,6 +33,15 @@ const {
   getUserTime,
   getUserRank,
 } = require("./database");
+
+const {
+  command: pokeCommand,
+  managementCommand: pokeManagementCommand,
+} = require("./commands/poke");
+const {
+  handlePokeInteraction,
+  handlePokeManagementCommand,
+} = require("./services/pokeService");
 
 initDatabase();
 
@@ -148,6 +156,9 @@ client.once("clientReady", async () => {
         ],
       });
 
+      await guild.commands.create(pokeCommand.toJSON());
+      await guild.commands.create(pokeManagementCommand.toJSON());
+
       console.log(`✅ Commands created in ${guild.name}`);
     } catch (error) {
       console.error(
@@ -162,7 +173,7 @@ client.once("clientReady", async () => {
     initVoiceKickBaseline(guild);
   });
 
-    // 🔥 PUBG Tracker
+  // 🔥 PUBG Tracker
   setInterval(() => {
     testPUBG(client);
   }, 60000);
@@ -172,11 +183,36 @@ client.once("clientReady", async () => {
 
 // Event: จัดการ Slash Commands
 client.on("interactionCreate", async (interaction) => {
-  if (interaction.isButton() && interaction.customId.startsWith("server_unban:")) {
+  if (
+    interaction.isUserContextMenuCommand() &&
+    interaction.commandName === "🔔 Poke"
+  ) {
+    return handlePokeInteraction(interaction);
+  }
+
+  if (
+    interaction.isModalSubmit() &&
+    interaction.customId.startsWith("poke:modal:")
+  ) {
+    return handlePokeInteraction(interaction);
+  }
+
+  if (interaction.isButton() && interaction.customId.startsWith("poke:send:")) {
+    return handlePokeInteraction(interaction);
+  }
+
+  if (
+    interaction.isButton() &&
+    interaction.customId.startsWith("server_unban:")
+  ) {
     return handleServerUnbanButton(interaction);
   }
 
   if (!interaction.isChatInputCommand()) return;
+
+  if (interaction.commandName === "poke") {
+    return handlePokeManagementCommand(interaction);
+  }
 
   if (interaction.commandName === "leaderboard") {
     return handleLeaderboard(interaction);
@@ -542,7 +578,10 @@ client.on("guildMemberRemove", async (member) => {
     }
     // ไม่พบ MEMBER_KICK entry ที่ตรง = ออกเอง (หรือเป็น Ban ซึ่งจัดการแยกที่ guildBanAdd) → ไม่ส่ง log
   } catch (error) {
-    console.error("⚠️ Error handling guildMemberRemove for server kick:", error.message);
+    console.error(
+      "⚠️ Error handling guildMemberRemove for server kick:",
+      error.message,
+    );
   }
 });
 
@@ -744,11 +783,16 @@ async function initVoiceKickBaseline(guild) {
   } catch (error) {
     if (error.code === 50013) {
       if (!auditLogPermissionWarned) {
-        console.log("⚠️ Bot ไม่มีสิทธิ์ View Audit Log — ข้ามการตรวจจับ Voice Kick");
+        console.log(
+          "⚠️ Bot ไม่มีสิทธิ์ View Audit Log — ข้ามการตรวจจับ Voice Kick",
+        );
         auditLogPermissionWarned = true;
       }
     } else {
-      console.error("⚠️ Error initializing voice kick baseline:", error.message);
+      console.error(
+        "⚠️ Error initializing voice kick baseline:",
+        error.message,
+      );
     }
   }
 }
@@ -768,7 +812,10 @@ async function checkVoiceKickDelta(guild) {
     try {
       entry = await fetchLatestDisconnectEntry(guild);
     } catch (error) {
-      console.error("⚠️ Error fetching audit logs for voice kick:", error.message);
+      console.error(
+        "⚠️ Error fetching audit logs for voice kick:",
+        error.message,
+      );
       continue;
     }
 
@@ -778,10 +825,16 @@ async function checkVoiceKickDelta(guild) {
     const currentCount = Number(entry.extra?.count ?? 1);
 
     // entry id เปลี่ยน = entry ใหม่ทั้งอัน ไม่เอาของเก่ามาลบเทียบ ถือว่า count ทั้งหมดคือของใหม่
-    const delta = entry.id !== baseline.entryId ? currentCount : currentCount - baseline.count;
+    const delta =
+      entry.id !== baseline.entryId
+        ? currentCount
+        : currentCount - baseline.count;
 
     // อัปเดต baseline ทุกครั้งที่เห็นการเปลี่ยนแปลง กันนับซ้ำในรอบถัดไป
-    voiceDisconnectBaseline.set(guild.id, { entryId: entry.id, count: currentCount });
+    voiceDisconnectBaseline.set(guild.id, {
+      entryId: entry.id,
+      count: currentCount,
+    });
 
     if (delta === 1) {
       return entry; // มี disconnect ใหม่เกิดขึ้นพอดี 1 ครั้ง ตรงกับ leave event ที่เพิ่งเกิด
@@ -807,9 +860,14 @@ function findVoiceKickAuditEntry(guild) {
   const guildId = guild.id;
   const prevInQueue = voiceKickCheckQueue.get(guildId) ?? Promise.resolve(null);
 
-  const run = prevInQueue.catch(() => null).then(() => checkVoiceKickDelta(guild));
+  const run = prevInQueue
+    .catch(() => null)
+    .then(() => checkVoiceKickDelta(guild));
 
-  voiceKickCheckQueue.set(guildId, run.catch(() => null));
+  voiceKickCheckQueue.set(
+    guildId,
+    run.catch(() => null),
+  );
 
   return run;
 }
@@ -906,14 +964,18 @@ async function findMatchingAuditEntry(
       const logs = await guild.fetchAuditLogs({ type: actionType, limit: 5 });
 
       const entry = logs.entries.find(
-        (e) => e.target?.id === targetId && Date.now() - e.createdTimestamp <= windowMs,
+        (e) =>
+          e.target?.id === targetId &&
+          Date.now() - e.createdTimestamp <= windowMs,
       );
 
       if (entry) return entry;
     } catch (error) {
       if (error.code === 50013) {
         if (!auditLogPermissionWarned) {
-          console.log("⚠️ Bot ไม่มีสิทธิ์ View Audit Log — ข้ามการตรวจจับ Kick/Ban");
+          console.log(
+            "⚠️ Bot ไม่มีสิทธิ์ View Audit Log — ข้ามการตรวจจับ Kick/Ban",
+          );
           auditLogPermissionWarned = true;
         }
         return null;
@@ -1098,7 +1160,10 @@ async function handleServerUnbanButton(interaction) {
 
   if (unbanInFlight.has(lockKey)) {
     return interaction
-      .reply({ content: "⏳ กำลังดำเนินการอยู่ กรุณารอสักครู่", ephemeral: true })
+      .reply({
+        content: "⏳ กำลังดำเนินการอยู่ กรุณารอสักครู่",
+        ephemeral: true,
+      })
       .catch(() => {});
   }
   unbanInFlight.add(lockKey);
@@ -1121,7 +1186,10 @@ async function handleServerUnbanButton(interaction) {
 
       console.error("⚠️ Error fetching ban before unban:", error.message);
       return interaction
-        .reply({ content: "❌ เกิดข้อผิดพลาดขณะตรวจสอบสถานะ Ban", ephemeral: true })
+        .reply({
+          content: "❌ เกิดข้อผิดพลาดขณะตรวจสอบสถานะ Ban",
+          ephemeral: true,
+        })
         .catch(() => {});
     }
 
@@ -1268,8 +1336,6 @@ client.on("reconnecting", () => {
 });
 
 client.on("error", console.error);
-
-
 
 require("./events/Delete-log")(client, CONFIG);
 require("./events/messageUpdate")(client, CONFIG);
