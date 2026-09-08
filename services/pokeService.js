@@ -29,6 +29,57 @@ function truncateEmbedField(value, maxLength = 1024) {
   return `${value.slice(0, maxLength - 3)}...`;
 }
 
+async function sendPokeLog({ interaction, target, messageText, count }) {
+  const logChannelId = process.env.POKE_LOG_CHANNEL_ID?.trim();
+  if (!logChannelId) return;
+
+  try {
+    const logChannel = await interaction.client.channels.fetch(logChannelId);
+    if (!logChannel?.isTextBased() || typeof logChannel.send !== "function") {
+      console.warn(`⚠️ Poke log channel is not text-based: ${logChannelId}`);
+      return;
+    }
+
+    const sentAt = Math.floor(Date.now() / 1000);
+    const embed = new EmbedBuilder()
+      .setTitle("🔔 Poke Sent")
+      .setColor(0x5865f2)
+      .addFields(
+        {
+          name: "👤 From",
+          value: truncateEmbedField(interaction.user.username),
+          inline: false,
+        },
+        {
+          name: "🎯 To",
+          value: truncateEmbedField(target.username),
+          inline: false,
+        },
+        {
+          name: "💬 Message",
+          value: truncateEmbedField(messageText),
+          inline: false,
+        },
+        {
+          name: "🔔 Count",
+          value: `×${count}`,
+          inline: true,
+        },
+        {
+          name: "⏰ Time",
+          value: `<t:${sentAt}:F>`,
+          inline: true,
+        },
+      )
+      .setFooter({ text: "Sentinel • Poke Log" })
+      .setTimestamp();
+
+    await logChannel.send({ embeds: [embed] });
+  } catch (error) {
+    console.error("⚠️ Cannot send Poke log:", error.message);
+  }
+}
+
 function getPermission(interaction) {
   const isOwner = isPokeOwner(interaction.user.id);
 
@@ -126,12 +177,10 @@ function getRemainingCooldown(userId, cooldownMs) {
   return Math.max(0, cooldownMs - (Date.now() - lastPokeAt));
 }
 
-async function handlePokeSend(interaction) {
+async function sendPoke(interaction, targetId, message, count) {
   const permission = getPermission(interaction);
   if (!permission.allowed) return permissionReply(interaction);
 
-  const [, , targetId, countText] = interaction.customId.split(":");
-  const count = Number(countText);
   if (!/^\d{17,20}$/.test(targetId) || ![1, 5, 10].includes(count)) {
     return interaction.reply({
       content: "❌ Poke นี้ไม่ถูกต้อง",
@@ -141,17 +190,7 @@ async function handlePokeSend(interaction) {
 
   if (!permission.isOwner && count !== 1) {
     return interaction.reply({
-      content: "❌ User ที่ได้รับอนุญาตใช้ได้เฉพาะ Poke x1",
-      ephemeral: true,
-    });
-  }
-
-  const pendingKey = `${interaction.user.id}:${targetId}`;
-  const pending = pendingPokes.get(pendingKey);
-  if (!pending || Date.now() - pending.createdAt > PENDING_POKE_TTL_MS) {
-    pendingPokes.delete(pendingKey);
-    return interaction.reply({
-      content: "❌ Poke หมดอายุแล้ว กรุณาเปิด Poke ใหม่",
+      content: "❌ คุณสามารถใช้ Poke ได้แค่ x1",
       ephemeral: true,
     });
   }
@@ -176,12 +215,11 @@ async function handlePokeSend(interaction) {
 
   pokeInFlight.add(interaction.user.id);
   pokeCooldowns.set(interaction.user.id, Date.now());
-  pendingPokes.delete(pendingKey);
 
   try {
     await interaction.deferReply({ ephemeral: true });
     const target = await interaction.client.users.fetch(targetId);
-    const messageText = truncateEmbedField(pending.message || "ไม่มีข้อความ");
+    const messageText = truncateEmbedField(message || "ไม่มีข้อความ");
 
     for (let index = 0; index < count; index++) {
       const embed = new EmbedBuilder()
@@ -216,15 +254,61 @@ async function handlePokeSend(interaction) {
       }
     }
 
+    await sendPokeLog({
+      interaction,
+      target,
+      messageText,
+      count,
+    });
+
     return interaction.editReply(
       `✅ ส่ง Poke ให้ ${target.username} แล้ว ×${count}`,
     );
   } catch (error) {
     console.error("⚠️ Error sending Poke DM:", error.message);
-    return interaction.editReply("❌ ไม่สามารถส่ง Poke ให้ User คนนี้ได้");
+    return interaction
+      .editReply("❌ ไม่สามารถส่ง Poke ให้ User คนนี้ได้")
+      .catch((replyError) =>
+        console.error(
+          "⚠️ Cannot respond to Poke interaction:",
+          replyError.message,
+        ),
+      );
   } finally {
     pokeInFlight.delete(interaction.user.id);
   }
+}
+
+async function handlePokeSend(interaction) {
+  const permission = getPermission(interaction);
+  if (!permission.allowed) return permissionReply(interaction);
+
+  const [, , targetId, countText] = interaction.customId.split(":");
+  const count = Number(countText);
+  const pendingKey = `${interaction.user.id}:${targetId}`;
+  const pending = pendingPokes.get(pendingKey);
+
+  if (!pending || Date.now() - pending.createdAt > PENDING_POKE_TTL_MS) {
+    pendingPokes.delete(pendingKey);
+    return interaction.reply({
+      content: "❌ Poke หมดอายุแล้ว กรุณาเปิด Poke ใหม่",
+      ephemeral: true,
+    });
+  }
+
+  pendingPokes.delete(pendingKey);
+  return sendPoke(interaction, targetId, pending.message, count);
+}
+
+async function handlePokeSlashCommand(interaction) {
+  const permission = getPermission(interaction);
+  if (!permission.allowed) return permissionReply(interaction);
+
+  const target = interaction.options.getUser("user", true);
+  const message = interaction.options.getString("message", true).trim();
+  const count = interaction.options.getInteger("count", true);
+
+  return sendPoke(interaction, target.id, message, count);
 }
 
 async function handlePokeInteraction(interaction) {
@@ -242,6 +326,10 @@ async function handlePokeManagementCommand(interaction) {
   }
 
   const subcommand = interaction.options.getSubcommand();
+
+  if (subcommand === "send") {
+    return handlePokeSlashCommand(interaction);
+  }
 
   if (subcommand === "allow" || subcommand === "revoke") {
     const user = interaction.options.getUser("user", true);
@@ -299,5 +387,6 @@ async function handlePokeManagementCommand(interaction) {
 
 module.exports = {
   handlePokeInteraction,
+  handlePokeSlashCommand,
   handlePokeManagementCommand,
 };

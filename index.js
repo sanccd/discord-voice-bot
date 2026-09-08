@@ -40,6 +40,7 @@ const {
 } = require("./commands/poke");
 const {
   handlePokeInteraction,
+  handlePokeSlashCommand,
   handlePokeManagementCommand,
 } = require("./services/pokeService");
 
@@ -74,6 +75,29 @@ const CONFIG = {
 if (!CONFIG.TOKEN) {
   console.error("❌ TOKEN ไม่มี!");
   process.exit(1);
+}
+
+async function upsertGuildCommand(guild, command) {
+  const commandData = command.toJSON();
+  const existingCommands = await guild.commands.fetch();
+  const matchingCommands = existingCommands.filter(
+    (existingCommand) =>
+      existingCommand.name === commandData.name &&
+      existingCommand.type === commandData.type,
+  );
+  const [currentCommand, ...duplicateCommands] = matchingCommands.values();
+
+  if (currentCommand) {
+    await guild.commands.edit(currentCommand.id, commandData);
+  } else {
+    await guild.commands.create(commandData);
+  }
+
+  await Promise.all(
+    duplicateCommands.map((duplicateCommand) =>
+      guild.commands.delete(duplicateCommand.id),
+    ),
+  );
 }
 
 // if (!CONFIG.LOG_CHANNEL_ID) {
@@ -156,8 +180,8 @@ client.once("clientReady", async () => {
         ],
       });
 
-      await guild.commands.create(pokeCommand.toJSON());
-      await guild.commands.create(pokeManagementCommand.toJSON());
+      await upsertGuildCommand(guild, pokeCommand);
+      await upsertGuildCommand(guild, pokeManagementCommand);
 
       console.log(`✅ Commands created in ${guild.name}`);
     } catch (error) {
@@ -211,6 +235,9 @@ client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
   if (interaction.commandName === "poke") {
+    if (interaction.options.getSubcommand() === "send") {
+      return handlePokeSlashCommand(interaction);
+    }
     return handlePokeManagementCommand(interaction);
   }
 

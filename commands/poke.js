@@ -35,6 +35,35 @@ const pokeManagementCommand = new SlashCommandBuilder()
   )
   .addSubcommand((subcommand) =>
     subcommand.setName("list").setDescription("แสดง Poke Access List"),
+  )
+  .addSubcommand((subcommand) =>
+    subcommand
+      .setName("send")
+      .setDescription("ส่ง Poke ให้ User โดยตรง")
+      .addUserOption((option) =>
+        option
+          .setName("user")
+          .setDescription("User ที่จะได้รับ Poke")
+          .setRequired(true),
+      )
+      .addStringOption((option) =>
+        option
+          .setName("message")
+          .setDescription("ข้อความที่จะส่ง")
+          .setRequired(true)
+          .setMaxLength(1000),
+      )
+      .addIntegerOption((option) =>
+        option
+          .setName("count")
+          .setDescription("จำนวนครั้งที่ส่ง")
+          .setRequired(true)
+          .addChoices(
+            { name: "x1", value: 1 },
+            { name: "x5", value: 5 },
+            { name: "x10", value: 10 },
+          ),
+      ),
   );
 
 module.exports = {
