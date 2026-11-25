@@ -70,7 +70,13 @@ async function testPUBG(client) {
     console.log("🆔 Player ID:", player.id);
 
     // 🎮 แมตช์ล่าสุด
-    const latestMatch = player.relationships.matches.data[0];
+    const latestMatch = player.relationships?.matches?.data?.[0];
+
+    // PUBG API เก็บประวัติแมตช์แค่ 14 วัน ถ้าไม่ได้เล่นช่วงนั้นจะไม่มีแมตช์ให้ดึง
+    if (!latestMatch) {
+      console.log("⚠️ ไม่มีแมตช์ล่าสุด (ไม่ได้เล่นใน 14 วันที่ผ่านมา)");
+      return;
+    }
 
     console.log("🎮 Latest Match ID:", latestMatch.id);
     if (lastMatchId === latestMatch.id) {
